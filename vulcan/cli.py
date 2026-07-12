@@ -318,9 +318,10 @@ def cmd_doctor(_: argparse.Namespace) -> int:
 def main() -> None:
     # Wrong-interpreter trap (post-mortem: `python3 -m vulcan.cli` used the
     # system python, missing all deps, and the run died mid-pipeline with a
-    # bare ModuleNotFoundError). Fail fast with the exact fix.
+    # bare ModuleNotFoundError). Fail fast with the exact fix. Probes are
+    # cheap venv-only imports — ddgs is the one that actually crashed live.
     try:
-        import faster_whisper  # noqa: F401
+        import ddgs  # noqa: F401
         import jsonschema  # noqa: F401
     except ImportError as e:
         print(f"ERROR missing dependency ({e.name}) — you are running the wrong Python "
