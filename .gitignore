@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+cache/*.db
+remotion/node_modules/
+remotion/out/
+.pytest_cache/
+sfx/*.wav
+fixtures/*.wav

@@ -1,0 +1,15 @@
+# VULCAN runtime deps. torch 2.8.0+cu128 comes from system site-packages (see RECON.md §3).
+# Resolved snapshot frozen in requirements.lock.txt at end of Phase 1.
+jsonschema>=4.21
+PyYAML>=6.0
+httpx>=0.27
+python-dotenv>=1.0
+Pillow>=10.3
+numpy>=1.26
+pytest>=8.0
+faster-whisper>=1.0
+rembg>=2.0.57
+onnxruntime>=1.18
+transformers>=4.44
+ddgs>=9.0
+requests>=2.32

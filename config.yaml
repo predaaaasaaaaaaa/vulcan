@@ -1,0 +1,71 @@
+# VULCAN configuration — single source for all tunables.
+# Values marked CALIBRATE are set during build phases and recorded in BUILDLOG.md.
+
+style:
+  accent_color: "#FFCC00"      # single accent; all other style tokens live in remotion/src/tokens.ts
+  font_family: "Outfit"        # committed .ttf in remotion/public/fonts — no runtime fetch
+
+audio:
+  target_lufs: -14.0
+  sfx_lufs: -22.0
+  music_bed: false             # optional CC0 bed at -26 LUFS with ducking; default OFF
+  music_bed_lufs: -26.0
+
+asr:
+  engine: faster-whisper       # decided Phase 2 (benchmark vs whisperx) — see BUILDLOG
+  model: small                 # decided Phase 2
+  compute_type: int8           # CPU inference
+  language: null               # null = auto-detect (English or French expected)
+
+director:
+  base_url: "https://api.minimax.io/anthropic"
+  api_key_env: "MINIMAX_API_KEY"
+  env_file: "/home/preda/.hermes/.env"   # key is READ from Hermes env at runtime, never stored
+  model: "MiniMax-M3"
+  temperature: 0.2
+  max_tokens: 8000
+  max_retries_per_pass: 3
+  timeout_s: 240
+
+beats:
+  min_ms: 1200
+  max_ms: 5000
+  pause_split_ms: 350
+
+assets:
+  min_edge_px: 500
+  siglip_model: "google/siglip-base-patch16-224"
+  siglip_threshold: null       # CALIBRATE Phase 3 on 10 hand-picked pairs; recorded in BUILDLOG
+  max_per_beat: 3
+  cache_db: "cache/media.db"
+
+render:
+  fps: 30
+  width: 1080
+  height: 1920
+  crf: 23                      # tuned Phase 4 so 3min <= 45MB
+  concurrency: null            # CALIBRATE Phase 4 (RAM-bound, see RECON §3); null = remotion default
+  timeout_min: 30
+
+qc:
+  duration_delta_ms: 150
+  max_size_mb: 45
+  lufs_tolerance: 1.0
+  frame_sample_every_s: 5
+  min_luma_variance: 4.0       # CALIBRATE Phase 6 against real renders
+
+delivery:
+  mode: hermes_send            # hermes_send | direct_bot (fallback)
+  bot_token_env: "TELEGRAM_BOT_TOKEN"
+  chat_id_env: "TELEGRAM_HOME_CHANNEL"
+
+trigger:
+  auto_mode: false             # Hermes asks "Forge this? y/n" before running
+  voice_latest_window_min: 15  # `vulcan run --latest` accepts oggs younger than this
+  voice_cache_dirs:
+    - "/home/preda/.hermes/cache/audio"
+    - "/home/preda/.hermes/audio_cache"
+
+paths:
+  runs_dir: "runs"
+  sfx_index: "sfx/index.json"
