@@ -142,9 +142,9 @@ _FLUENT_RAW = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/a
 
 
 def _fluent_slug(name: str) -> tuple[str, str]:
-    """'Fire' → ('Fire', 'fire_3d.png'); 'Money bag' → ('Money bag', 'money_bag_3d.png')."""
-    folder = name.strip()
-    fname = re.sub(r"[^a-z0-9]+", "_", folder.lower()).strip("_") + "_3d.png"
+    """Fluent folders are sentence case: 'money bag' → ('Money bag', 'money_bag_3d.png')."""
+    folder = name.strip().lower().capitalize()
+    fname = re.sub(r"[^a-z0-9]+", "_", name.strip().lower()).strip("_") + "_3d.png"
     return folder, fname
 
 
@@ -152,31 +152,21 @@ def fluent_emoji_by_char(emoji_char: str) -> list[Candidate]:
     """Resolve an emoji character to its fluent 3D PNG via its unicode name."""
     try:
         base = emoji_char[0]
-        uname = unicodedata.name(base, "").title()  # 'FIRE' → 'Fire'
+        uname = unicodedata.name(base, "").lower()  # 'FIRE' → 'fire'
     except Exception:
         uname = ""
     if not uname:
         return []
     candidates = [uname]
     # unicode names vs fluent folder names differ in known ways
-    if uname.endswith(" Face"):
-        candidates.append(uname)
-    cleaned = uname.replace("Face With ", "").replace(" Symbol", "")
+    cleaned = uname.replace("face with ", "").replace(" symbol", "").replace("heavy ", "")
     if cleaned != uname:
         candidates.append(cleaned)
-    out = []
-    for cand in candidates:
-        folder, fname = _fluent_slug(cand)
-        out.append(Candidate(
-            url=f"{_FLUENT_RAW}/{folder}/3D/{fname}".replace(" ", "%20"),
-            source="fluent3d", width=1024, height=1024, likely_alpha=True,
-        ))
-    return out
+    return [c for name in candidates for c in fluent_emoji_by_name(name)]
 
 
 def fluent_emoji_by_name(name: str) -> list[Candidate]:
     folder, fname = _fluent_slug(name)
-    folder = folder.title() if folder.islower() else folder
     return [Candidate(
         url=f"{_FLUENT_RAW}/{folder}/3D/{fname}".replace(" ", "%20"),
         source="fluent3d", width=1024, height=1024, likely_alpha=True,
