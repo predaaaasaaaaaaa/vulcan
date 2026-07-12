@@ -26,6 +26,7 @@ RULES (hard):
 9. payload only when the treatment requires it. list_stack item texts ≤28 chars, paraphrase allowed.
 10. The FIRST beat is the hook: strong treatment (cutout_pop / stat_slam / emoji_burst if possible), punch_in, an sfx on the entrance.
 11. The LAST beat should land: quote_card / emoji_burst / stat_slam if the words allow, transition_out=hard_cut.
+12. **ABSTRACT-TOPIC RULE (hard):** If the beat contains NO concrete proper noun (person, place, brand, named product), NO specific number, and NO visualizable object — DO NOT request cutout_pop / screenshot_zoom / logo_versus. Only these treatments are valid for abstract beats: kinetic_type, stat_slam (only if a number is spoken), emoji_burst, list_stack, quote_card, tweet_card. For purely-opinion / commentary / thesis beats, default to kinetic_type + emoji_burst on the anchor emotion. Never scrape random objects (animals, generic icons, stock metaphors) to "represent" an idea — the visual must be the WORDS, not a literal image chosen by the LLM.
 
 ## SFX MENU (id — feel)
 whoosh_01 fast airy · whoosh_02 deep · whoosh_03 short whip · whoosh_04 double · whoosh_05 reverse swell

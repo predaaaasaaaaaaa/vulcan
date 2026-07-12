@@ -33,23 +33,56 @@ def status(msg: str) -> None:
     print(f"STATUS {msg}", flush=True)
 
 
+CONSUMED_LEDGER = RUNS_DIR / ".consumed.json"
+
+
+def _load_ledger() -> dict:
+    try:
+        return json.loads(CONSUMED_LEDGER.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def mark_voice_consumed(voice: Path, video_id: str) -> None:
+    """Remember which cached note a run consumed so --latest never re-forges
+    an old message when the user sends a new one (mismatch guard)."""
+    ledger = _load_ledger()
+    try:
+        key = f"{voice.resolve()}:{voice.stat().st_mtime_ns}"
+    except OSError:
+        return
+    ledger[key] = {"video_id": video_id, "at": time.time()}
+    # keep the ledger small — entries older than 48h can't collide with the window
+    cutoff = time.time() - 48 * 3600
+    ledger = {k: v for k, v in ledger.items() if v["at"] >= cutoff}
+    CONSUMED_LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    CONSUMED_LEDGER.write_text(json.dumps(ledger, indent=1))
+
+
 def find_latest_voice() -> Path:
-    """Newest .ogg in the Hermes audio caches within the freshness window."""
+    """Newest UNCONSUMED .ogg in the Hermes audio caches within the window."""
     window_min = config.get("trigger.voice_latest_window_min", 15)
     dirs = [Path(d) for d in config.get("trigger.voice_cache_dirs", [])]
+    consumed = set(_load_ledger().keys())
     candidates: list[tuple[float, Path]] = []
+    skipped = 0
     now = time.time()
     for d in dirs:
         if not d.is_dir():
             continue
         for f in d.glob("*.ogg"):
-            age_min = (now - f.stat().st_mtime) / 60
-            if age_min <= window_min:
-                candidates.append((f.stat().st_mtime, f))
+            st = f.stat()
+            if (now - st.st_mtime) / 60 > window_min:
+                continue
+            if f"{f.resolve()}:{st.st_mtime_ns}" in consumed:
+                skipped += 1
+                continue
+            candidates.append((st.st_mtime, f))
     if not candidates:
+        already = " (a recent note exists but was already forged — ask for a new one)" if skipped else ""
         raise SystemExit(
-            f"ERROR no voice note newer than {window_min} min found in "
-            f"{', '.join(str(d) for d in dirs)} — ask the user to resend it."
+            f"ERROR no unconsumed voice note newer than {window_min} min found in "
+            f"{', '.join(str(d) for d in dirs)}{already} — ask the user to (re)send it."
         )
     return sorted(candidates)[-1][1]
 
@@ -68,6 +101,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not voice.exists():
         print(f"ERROR voice file not found: {voice}")
         return 2
+    consumed_from_cache = args.latest
 
     video_id = f"v_{time.strftime('%Y%m%d_%H%M%S')}"
     run_dir = RUNS_DIR / video_id
@@ -131,6 +165,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         final = run_dir / "out" / "final.mp4"
         shutil.copy(mp4, final)
+        if consumed_from_cache:
+            mark_voice_consumed(voice, video_id)
         status(f"7/7 deliver — {metrics['size_mb']}MB, {metrics['duration_ms']/1000:.0f}s")
 
         post_kit = manifest.get("post_kit")
@@ -167,6 +203,69 @@ def cmd_status(args: argparse.Namespace) -> int:
     }
     for stage, p in marks.items():
         print(f"{stage:9s} {'✅' if p.exists() else '—'}  {p}")
+    return 0
+
+
+def _dir_size(p: Path) -> int:
+    return sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) if p.exists() else 0
+
+
+def cleanup_run(run_dir: Path, purge: bool = False) -> tuple[int, int]:
+    """Reclaim a run's intermediate noise. Returns (bytes_freed, assets_migrated).
+
+    Keeps the receipts (manifest, words, pipeline.log, qc report + contact
+    sheet, final.mp4) unless purge=True, which removes the whole run dir.
+    Cache-referenced assets are migrated to cache/assets/ first — cleanup
+    never costs the cross-run cache its files.
+    """
+    from .assets.cache import migrate_run_assets
+    from .paths import CACHE_DIR
+
+    before = _dir_size(run_dir)
+    migrated = migrate_run_assets(run_dir / "assets", CACHE_DIR / "assets")
+
+    if purge:
+        shutil.rmtree(run_dir, ignore_errors=True)
+        return before, migrated
+
+    noise = [
+        run_dir / "audio",
+        run_dir / "assets",          # leftovers after migration (rejected candidates)
+        run_dir / "qc" / "frames",
+        run_dir / "props.json",
+        run_dir / "out" / "raw.mp4",
+        run_dir / "out" / "raw_repair.mp4",
+        run_dir / "out" / "render.log",
+    ]
+    for p in noise:
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+        elif p.exists():
+            p.unlink(missing_ok=True)
+    return before - _dir_size(run_dir), migrated
+
+
+def cmd_cleanup(args: argparse.Namespace) -> int:
+    if not args.video_id and not args.all:
+        print("ERROR cleanup needs a video_id or --all")
+        return 2
+    targets: list[Path] = []
+    if args.all:
+        targets = sorted(p for p in RUNS_DIR.glob("v_*") if p.is_dir() and p.name != "golden")
+    else:
+        run_dir = RUNS_DIR / args.video_id
+        if not run_dir.exists():
+            print(f"ERROR no such run: {args.video_id}")
+            return 1
+        targets = [run_dir]
+    total_freed = total_migrated = 0
+    for run_dir in targets:
+        freed, migrated = cleanup_run(run_dir, purge=args.purge)
+        total_freed += freed
+        total_migrated += migrated
+        print(f"CLEANED {run_dir.name} freed={freed/1e6:.1f}MB migrated_assets={migrated}"
+              + (" (purged)" if args.purge else ""))
+    print(f"DONE cleanup: {total_freed/1e6:.1f}MB freed, {total_migrated} assets moved to shared cache")
     return 0
 
 
@@ -216,6 +315,12 @@ def main() -> None:
     p_st = sub.add_parser("status", help="show stage artifacts for a run")
     p_st.add_argument("video_id")
     p_st.set_defaults(fn=cmd_status)
+
+    p_cl = sub.add_parser("cleanup", help="reclaim a run's intermediate files after the video is approved")
+    p_cl.add_argument("video_id", nargs="?", help="run to clean (keeps final.mp4 + receipts)")
+    p_cl.add_argument("--all", action="store_true", help="clean every run except runs/golden")
+    p_cl.add_argument("--purge", action="store_true", help="delete the run dir entirely (video already taken)")
+    p_cl.set_defaults(fn=cmd_cleanup)
 
     sub.add_parser("doctor", help="environment self-check").set_defaults(fn=cmd_doctor)
 

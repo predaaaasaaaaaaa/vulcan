@@ -125,3 +125,10 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - Final docs shipped: [README.md](README.md) — deep technical walkthrough, exact Hermes mechanics, ops notes, and the adopter's guide for wiring VULCAN into other agents (three-invariants doctrine).
 
 **DONE criteria state:** `vulcan run` green E2E on the 62s and 150s test notes ✅ · SKILL.md registered ✅ · golden run on Samy's real note → pending his voice note + review.
+
+### Post-announce upgrades (Samy's request, 2026-07-12)
+- **`vulcan cleanup <id> [--purge] | --all`** — approval-triggered reclaim: keeps `final.mp4` + receipts (manifest/words/QC report/log), frees intermediates (~70%: mastered wav, raw renders, QC frames, rejected asset candidates). Validated assets **migrate to `cache/assets/` with media.db paths updated first** — cleanup never costs the cross-run cache. Live-verified on run 064411: 26MB → 7.8MB, 3 assets migrated, 0 broken cache paths.
+- **Consumed-notes ledger** (`runs/.consumed.json`, keyed path+mtime, 48h TTL): `run --latest` skips notes that were already forged — an old cached voice message can never be re-forged when the user means a new one (the old/new mismatch Samy flagged). Distinct error text tells the agent to ask for a fresh note.
+- **SKILL.md v1.1 (fattened)**: full command reference, exact background-invocation recipe (nohup + poll pattern for any harness), complete output-protocol table with per-line agent actions, a worked happy-path session transcript, the cleanup doctrine (§6: clean on approval, keep on rejection-for-retry, purge on request, weekly `--all`), and a §8 for non-Hermes agents. README synced.
+- +3 tests (cleanup keeps/removes the right files, purge, ledger blocks re-forging) → **67 passed**.
+- Also: Samy hardened `prompts/pass_b.md` with rule 12 (abstract-topic rule: no literal-object scraping for abstract beats) — kept verbatim.

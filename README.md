@@ -216,9 +216,17 @@ Manual use (no Hermes needed):
 ```bash
 bin/vulcan doctor                      # environment self-check
 bin/vulcan run path/to/voice.ogg       # full pipeline on a file
-bin/vulcan run --latest                # newest cached Telegram voice note
+bin/vulcan run --latest                # newest UNCONSUMED cached voice note
 bin/vulcan status v_20260712_105540    # stage artifacts of a run
+bin/vulcan cleanup v_20260712_105540   # after approval: free ~70% of the run (keeps final.mp4 + receipts)
+bin/vulcan cleanup --all [--purge]     # housekeeping across runs (golden never touched)
 ```
+
+Two freshness guarantees keep old and new messages from ever mixing:
+`--latest` consults a **consumed-notes ledger** (`runs/.consumed.json`) so a
+note that was already forged is never picked again, and `cleanup` migrates
+cache-worthy assets to `cache/assets/` before deleting a run's intermediates —
+each generation starts from a clean state without losing the cross-run cache.
 
 ---
 
@@ -281,6 +289,9 @@ Your agent needs exactly three behaviors — copy the doctrine from
 3. **Deliver:** on `DONE`, send the file from the `DELIVER MEDIA:<path>` line
    + the `POST_KIT_START…END` text. On `ERROR`, map the last STATUS stage to
    a human message (table in SKILL.md); retry at most once.
+4. **Clean up on approval:** when the user accepts/takes the video, run
+   `bin/vulcan cleanup <RUN_ID>` (see SKILL.md §6) — keeps `final.mp4` and the
+   receipts, frees the intermediates, and preserves the shared asset cache.
 
 **Do not** let your agent edit manifests, pick timings, or "help" the
 pipeline. The whole design is that the agent is a thin relay around one

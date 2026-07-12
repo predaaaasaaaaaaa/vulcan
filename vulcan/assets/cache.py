@@ -58,6 +58,34 @@ def add(query: str, asset_type: str, source: str, path: str | Path,
         )
 
 
+def migrate_run_assets(run_assets_dir: Path, shared_dir: Path) -> int:
+    """Move media.db-referenced assets out of a run dir into the shared store
+    (cache/assets/) and update their DB paths — run cleanup must not cost the
+    cross-run cache its files. Returns number migrated."""
+    import shutil
+
+    shared_dir.mkdir(parents=True, exist_ok=True)
+    run_assets_dir = run_assets_dir.resolve()
+    moved = 0
+    with _conn() as c:
+        rows = c.execute("SELECT id, path FROM media").fetchall()
+        for row_id, path in rows:
+            p = Path(path)
+            try:
+                inside = p.resolve().parent == run_assets_dir
+            except OSError:
+                continue
+            if not inside or not p.exists():
+                continue
+            dest = shared_dir / p.name
+            if dest.exists():
+                dest = shared_dir / f"{p.stem}_{row_id}{p.suffix}"
+            shutil.move(str(p), dest)
+            c.execute("UPDATE media SET path = ? WHERE id = ?", (str(dest), row_id))
+            moved += 1
+    return moved
+
+
 def find_similar(text_embedding: np.ndarray, asset_type: str, threshold: float) -> dict | None:
     """Best cached asset of this type whose image embedding ⋅ text embedding ≥ threshold."""
     with _conn() as c:
