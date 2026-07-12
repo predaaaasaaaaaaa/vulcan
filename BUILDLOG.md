@@ -113,3 +113,15 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Gate: two consecutive `vulcan run` greens** (v_20260712_065947 + prior), run 2 via **simulated Telegram trigger** (fixture copied into `~/.hermes/cache/audio/`, `--latest` picked it up). **Both DONE-criteria notes green**: 62s → 8.2MB and 150s → 48 beats/10 assets/17.3MB (projects ≈35MB for 3min, inside the 45MB cap). Frames eye-checked on both.
 
 **Evidence:** `runs/v_20260712_065947/`, `runs/v_20260712_105540/` (manifest, pipeline.log, qc/, out/final.mp4), scratchpad `e2e_r1.log`, `e2e_r2.log`, `e2e_150b.log`, `l150_sheet.png`.
+
+---
+
+## PHASE 7 — GOLDEN RUN
+**Status: 🟡 ARMED — awaiting Samy's voice note** — 2026-07-12
+
+- 11:05 — "VULCAN is live" announcement delivered to Samy's Telegram DM via `hermes send --to telegram` (home channel chat_id <redacted>, exit 0).
+- The trigger loop is fully wired: voice note → gateway caches ogg → `vulcan` skill (enabled, verified in `hermes skills list`) → one-tap confirm → `bin/vulcan run --latest` in background → STATUS relay → `MEDIA:` delivery + post kit.
+- [FEEDBACK.md](FEEDBACK.md) ready to capture his notes verbatim + the iteration log.
+- Final docs shipped: [README.md](README.md) — deep technical walkthrough, exact Hermes mechanics, ops notes, and the adopter's guide for wiring VULCAN into other agents (three-invariants doctrine).
+
+**DONE criteria state:** `vulcan run` green E2E on the 62s and 150s test notes ✅ · SKILL.md registered ✅ · golden run on Samy's real note → pending his voice note + review.
