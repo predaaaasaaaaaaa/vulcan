@@ -11,7 +11,8 @@ import re
 from pathlib import Path
 
 from .. import config
-from ..beats import beat_length_problems, clamp_asset_enter, cuts_to_beats, silence_gaps
+from ..beats import (beat_length_problems, clamp_asset_enter, cuts_to_beats,
+                     repair_cuts, silence_gaps)
 from ..validate import load_sfx_cues, validate_manifest
 from .client import DirectorError, chat, extract_json
 
@@ -64,10 +65,16 @@ def pass_a(words: list[dict], duration_ms: int) -> list[dict]:
             cuts = extract_json(text).get("cuts")
             if not isinstance(cuts, list) or not all(isinstance(c, int) for c in cuts):
                 raise ValueError("output must be {\"cuts\": [int, ...]}")
-            skeleton = cuts_to_beats(words, cuts, duration_ms)
+            # MiniMax picks idea boundaries; math enforces beat-length law.
+            # (A weak reasoner cannot reliably satisfy numeric constraints —
+            # deterministic repair beats re-asking, see BUILDLOG Phase 5.)
+            repaired = repair_cuts(words, cuts, duration_ms)
+            skeleton = cuts_to_beats(words, repaired, duration_ms)
             problems = beat_length_problems(skeleton)
             if problems:
                 raise ValueError("; ".join(problems[:6]))
+            if repaired != sorted(set(c for c in cuts if isinstance(c, int))):
+                log.info("pass A: repaired cuts %s → %s", cuts, repaired)
             log.info("pass A ok: %d beats (attempt %d)", len(skeleton), attempt + 1)
             return skeleton
         except (ValueError, DirectorError) as e:
@@ -246,9 +253,20 @@ def apply_patches(manifest: dict, patches: list[dict], words: list[dict]) -> lis
     """Apply whitelisted patch ops in place; returns list of rejected-patch notes."""
     notes = []
     by_id = {b["id"]: b for b in manifest["beats"]}
-    label_index = {}
-    for a in manifest["assets"]:
-        label_index[_norm(a["queries"][0])] = a
+
+    def find_asset(label: str):
+        """Labels aren't stored in the manifest (schema is closed) — match the
+        normalized label against any query, exact first then substring."""
+        want = _norm(label)
+        if not want:
+            return None
+        for a in manifest["assets"]:
+            if any(_norm(q) == want for q in a["queries"]):
+                return a
+        for a in manifest["assets"]:
+            if any(want in _norm(q) or _norm(q) in want for q in a["queries"]):
+                return a
+        return None
     for p in patches[:12]:
         try:
             op, bid = p.get("op"), p.get("beat")
@@ -291,7 +309,7 @@ def apply_patches(manifest: dict, patches: list[dict], words: list[dict]) -> lis
                     new.append({"cue": str(s["cue"]), "at_ms": max(min(at, blen), 0)})
                 b["sfx"] = new
             elif op == "set_asset_queries":
-                a = label_index.get(_norm(str(p.get("label", ""))))
+                a = find_asset(str(p.get("label", "")))
                 if a is None:
                     # fall back: single asset on that beat
                     refs = b["assets"]
@@ -301,8 +319,7 @@ def apply_patches(manifest: dict, patches: list[dict], words: list[dict]) -> lis
                 a["queries"] = [str(q)[:80] for q in p["queries"]][:3]
                 a["status"], a["path"], a["score"] = "pending", None, None
             elif op == "drop_asset":
-                label = _norm(str(p.get("label", "")))
-                a = label_index.get(label)
+                a = find_asset(str(p.get("label", "")))
                 if a is None:
                     raise ValueError(f"unknown asset label {p.get('label')!r}")
                 b["assets"] = [r for r in b["assets"] if r["asset_id"] != a["asset_id"]]

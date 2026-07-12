@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# VULCAN guarded actuator — the one CLI Hermes invokes.
+exec /home/preda/vulcan/.venv/bin/python -m vulcan.cli "$@"

@@ -84,3 +84,17 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Final gate:** `runs/golden/out/golden.mp4` — **QC PASS**: Δduration 59ms, 8.57MB (≈25MB for 3min, well under the 45MB cap → CRF 23 confirmed), −14.62 LUFS, 12/12 sampled frames alive. Render 77s for 62s @ concurrency 4 (RAM watchdog silent) → `render.concurrency: 4` calibrated.
 
 **Evidence:** `runs/golden/out/golden.mp4`, `runs/golden/qc/` (r2_sheet_1..4.png = all 20 beat frames, contact_sheet.png, qc_report.json), `runs/golden/manifest.json`.
+
+---
+
+## PHASE 5 — DIRECTOR (MiniMax 3-pass + post kit)
+**Status: ✅ PASS** — 2026-07-12
+
+- [vulcan/director/client.py](vulcan/director/client.py): MiniMax-M3 via its **Anthropic-compatible** `/v1/messages` (Hermes's own endpoint + key, read at call time from `~/.hermes/.env`; zero Anthropic-service calls). Transient-error backoff ×4, strict JSON extraction tolerant of fences.
+- Prompts ([pass_a](vulcan/director/prompts/pass_a.md), [pass_b](vulcan/director/prompts/pass_b.md), [pass_c](vulcan/director/prompts/pass_c.md), [pass_d](vulcan/director/prompts/pass_d.md)): full menus (9 treatments with triggers, 43 sfx with feel-tags, cameras, transitions), hard rules, and worked examples authored at target quality (incl. a French Pass-A example for language coverage). **MiniMax only ever emits word indices and menu picks — never a millisecond.**
+- [vulcan/director/passes.py](vulcan/director/passes.py): deterministic conversion (`assemble_manifest`) turns Pass-B JSON into the manifest — word-anchor validation, asset dedup by (type,label), enter-clamp, payload normalization; every model mistake becomes a named, injectable error. Pass C = whitelisted patch ops applied transactionally (validation break → full revert). Pass D post kit with hashtag normalization.
+- **Live finding → design upgrade:** MiniMax could not satisfy the 1.2–5.0s beat-length law on slow speech even with error injection (4/4 rejects). Fix: `repair_cuts` — MiniMax picks idea boundaries, **math repairs lengths** (extra cuts at largest internal silences, orphan merges, fixed-point iteration). On the exact failing cut set, repair reproduced nearly the same boundaries I hand-picked for the golden manifest. Re-asking a weak reasoner for arithmetic is a dead end; mechanical repair is doctrine now.
+- Unit tests: +11 (`tests/test_director_assembly.py`) → **60 passed** total.
+- **Gate: 5/5 consecutive full chains valid** on the Phase-2 transcript (19–20 beats, 6–7 assets, 28–55s per chain). Observed self-healing in the wild: hallucinated cue `kick_01` → rejected+fixed on retry; missing stat payloads → fixed; a Pass-C patch that broke validation → auto-reverted. Run-5 sample quality: hook beat = cutout_pop/punch_in/whoosh + fox emphasis; query specificity like "red fox looking up at grapes illustration"; postable post kit.
+
+**Evidence:** gate output in session log, sample manifests in scratchpad `dirgate_1..5.json`.

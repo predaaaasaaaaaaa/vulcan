@@ -72,6 +72,62 @@ def beat_length_problems(beats: list[dict], min_ms: int = MIN_BEAT_MS, max_ms: i
     return problems
 
 
+def sanitize_cuts(cut_indices: list[int], n_words: int) -> list[int]:
+    """Drop out-of-range/duplicate indices and sort — mechanical forgiveness
+    for weak-reasoner slips; the idea boundaries that survive stay theirs."""
+    return sorted({c for c in cut_indices if isinstance(c, int) and 0 <= c < n_words - 1})
+
+
+def repair_cuts(words: list[dict], cut_indices: list[int], duration_ms: int,
+                min_ms: int = MIN_BEAT_MS, max_ms: int = MAX_BEAT_MS) -> list[int]:
+    """Deterministically fix beat-length violations in a cut set.
+
+    Too-long beats get extra cuts at their largest internal silence gaps
+    (falling back to the word nearest the midpoint); too-short beats get
+    merged into the shorter neighbor. The LLM chooses ideas; math fixes
+    lengths. Iterates to a fixed point.
+    """
+    cuts = sanitize_cuts(cut_indices, len(words))
+
+    for _ in range(40):  # fixed-point iteration, bounded
+        beats = cuts_to_beats(words, cuts, duration_ms)
+        # merge too-short beats first (changes lengths of neighbors)
+        short = next((i for i, b in enumerate(beats)
+                      if b["end_ms"] - b["start_ms"] < min_ms), None)
+        if short is not None:
+            if len(beats) == 1:
+                break  # single short beat — nothing to merge, let validator speak
+            # remove the boundary shared with the shorter neighbor
+            if short == 0:
+                drop = cuts[0]
+            elif short == len(beats) - 1:
+                drop = cuts[-1]
+            else:
+                left = beats[short - 1]["end_ms"] - beats[short - 1]["start_ms"]
+                right = beats[short + 1]["end_ms"] - beats[short + 1]["start_ms"]
+                drop = cuts[short - 1] if left <= right else cuts[short]
+            cuts = [c for c in cuts if c != drop]
+            continue
+
+        long_i = next((i for i, b in enumerate(beats)
+                       if b["end_ms"] - b["start_ms"] > max_ms), None)
+        if long_i is None:
+            return cuts
+        b = beats[long_i]
+        lo, hi = b["first_word"], b["last_word"]
+        if hi <= lo:
+            break  # single word longer than max — impossible to cut
+        # best internal cut: largest silence gap, else word closest to midpoint
+        internal = range(lo, hi)  # cut AFTER these words stays inside the beat
+        gaps = [(words[i + 1]["s"] - words[i]["e"], i) for i in internal]
+        best_gap, best_i = max(gaps)
+        if best_gap < 120:
+            mid = (b["start_ms"] + b["end_ms"]) / 2
+            best_i = min(internal, key=lambda i: abs(words[i]["e"] - mid))
+        cuts = sorted(set(cuts) | {best_i})
+    return cuts
+
+
 ASSET_ENTER_MAX_FRAC = 0.55
 
 
