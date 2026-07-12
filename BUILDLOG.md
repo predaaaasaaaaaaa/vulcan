@@ -32,3 +32,23 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Gate: `pytest` → 39 passed** (happy paths + adversarial: overlaps, gaps, wrong start/end, orphan assets, hallucinated asset ids, fake sfx cues, out-of-bounds windows/sfx/list-items, unspoken emphasis words, 7-word headline, bad enums, extra keys, 6 hashtags, render-gate violations).
 
 **Evidence:** `tests/test_validator.py` (39 tests), `pytest -q` output in session log.
+
+---
+
+## PHASE 2 — AUDIO
+**Status: ✅ PASS** — 2026-07-12
+
+- [vulcan/ingest.py](vulcan/ingest.py): decode → afftdn (nr=12, gentle — heavy NR smears consonants and hurts ASR) → acompressor 3:1 → **two-pass linear loudnorm** → residual-gain correction with limiter. First attempt undershot (−15.79 LUFS: TP ceiling capped linear gain on dynamic source) → fixed with pre-compression + correction pass. Final fixture: **−14.59 LUFS** (inside qc ±1), mono 48k wav. The mastered track is the single timeline for ASR+render+QC.
+- Fixture: `fixtures/fixture_60s.ogg` — 62s LibriVox public-domain English speech, re-encoded **opus-in-ogg** to mimic a Telegram voice note exactly. Source: archive.org `babys_own_aesop_librivox` (PD).
+- **ASR benchmark on the 62s fixture (CPU, 12 threads):**
+  | engine | total | words | mean confidence |
+  |---|---|---|---|
+  | faster-whisper base int8 | 6.4s | 86 | 0.885 |
+  | faster-whisper **small int8** | **9.7s** | **86** | **0.937** |
+  | whisperx small + wav2vec2 align | **259.6s** (align alone 244.9s) | 85 | 0.840 |
+- **Decision: faster-whisper / small / int8 / CPU.** WhisperX's aligner is 25× slower on CPU (a 3-min note would spend ~13 min in ASR alone) for a boundary difference of ~±200ms — irrelevant at 3–5-word caption groups and 30fps. GPU could fix it but GPU is optional-only per doctrine (and llama-server holds 734MB VRAM). `small` beats `base` on confidence for +3s; it also carries French far better (auto language detect verified: en @ 0.995).
+- ASR hardening: `_normalize_words` fixes whisper's known zero-duration-word quirk (20ms floor, monotonic clamp) — mechanical normalization, not timing invention. `sanity_check_words` gate: monotonicity, in-bounds, ≤3s words, ≥75% words above 0.30 confidence — failures abort loudly.
+- [vulcan/beats.py](vulcan/beats.py) (pre-work for Pass A): Director returns **cut indices, never milliseconds** — `cuts_to_beats` computes boundaries at silence midpoints, so tiling is perfect **by construction**, validator double-checks anyway. +10 tests.
+- **Gate: `runs/phase2_test/words.json`** — 86 words with per-word ms timestamps + probabilities, sanity checks green. pytest: 49 passed.
+
+**Evidence:** `runs/phase2_test/words.json`, `runs/phase2_test/words_fw_base.json`, `runs/phase2_test/words_whisperx.json`, benchmark output in session log.
