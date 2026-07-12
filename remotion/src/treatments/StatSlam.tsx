@@ -8,6 +8,7 @@ import React from 'react';
 import {AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Tokens} from '../tokens';
 import type {Beat} from '../types';
+import type {AssetMap} from './common';
 import {Glow} from './common';
 
 const parseStat = (text: string): {prefix: string; num: number; decimals: number; suffix: string} | null => {
@@ -18,7 +19,7 @@ const parseStat = (text: string): {prefix: string; num: number; decimals: number
   return {prefix: m[1], num: parseFloat(numStr), decimals, suffix: m[3]};
 };
 
-export const StatSlam: React.FC<{beat: Beat; assets: unknown; tokens: Tokens}> = ({beat, tokens}) => {
+export const StatSlam: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> = ({beat, tokens}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const statText = beat.payload?.stat_text ?? '';

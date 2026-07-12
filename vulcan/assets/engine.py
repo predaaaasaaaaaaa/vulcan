@@ -61,7 +61,6 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
     """
     if threshold is None:
         threshold = config.get("assets.siglip_threshold") or 0.06
-    min_edge = config.get("assets.min_edge_px", 500)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     failures: list[str] = []
@@ -90,7 +89,22 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
                 raw = _download(cand.url)
                 if cand.extra.get("svg"):
                     raw = rasterize_svg(raw, size=1024)
-                info = stamp(raw, out_path, kind=asset["type"], min_edge=min_edge)
+                info = stamp(raw, out_path, kind=asset["type"])
+
+                # dark logos vanish on the near-black canvas — refetch mono
+                # iconify sets in white; reject dark rasters outright
+                if asset["type"] == "logo":
+                    from .stamp import mean_luma
+                    from PIL import Image as _Img
+                    if mean_luma(_Img.open(out_path)) < 0.22:
+                        if cand.extra.get("svg") and "color=" not in cand.url:
+                            raw = _download(cand.url + "&color=%23FFFFFF")
+                            raw = rasterize_svg(raw, size=1024)
+                            info = stamp(raw, out_path, kind=asset["type"])
+                            if mean_luma(_Img.open(out_path)) < 0.22:
+                                raise ValueError("logo still too dark after white recolor")
+                        else:
+                            raise ValueError("logo too dark for near-black canvas")
 
                 if _needs_siglip(cand):
                     score, img_emb = relevance(out_path, phrase)

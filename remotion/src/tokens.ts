@@ -113,9 +113,12 @@ export const TOKENS = {
   },
 } as const;
 
-export type Tokens = typeof TOKENS;
+export type Tokens = Omit<typeof TOKENS, 'color'> & {
+  color: Omit<(typeof TOKENS)['color'], 'accent'> & {accent: string};
+};
 
 /** Accent override plumbing — Master reads inputProps.style?.accent. */
-export const withAccent = (accent?: string) => accent && /^#[0-9A-Fa-f]{6}$/.test(accent)
-  ? {...TOKENS, color: {...TOKENS.color, accent}}
-  : TOKENS;
+export const withAccent = (accent?: string): Tokens =>
+  accent && /^#[0-9A-Fa-f]{6}$/.test(accent)
+    ? {...TOKENS, color: {...TOKENS.color, accent}}
+    : (TOKENS as Tokens);

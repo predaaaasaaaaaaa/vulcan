@@ -7,11 +7,12 @@ import React from 'react';
 import {AbsoluteFill, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Tokens} from '../tokens';
 import type {Beat} from '../types';
+import type {AssetMap} from './common';
 
 const initials = (name: string): string =>
   name.split(/\s+/).map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
 
-export const TweetCard: React.FC<{beat: Beat; assets: unknown; tokens: Tokens}> = ({beat, tokens}) => {
+export const TweetCard: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> = ({beat, tokens}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const tweet = beat.payload?.tweet;

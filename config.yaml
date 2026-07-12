@@ -35,7 +35,7 @@ beats:
 assets:
   min_edge_px: 500
   siglip_model: "google/siglip-base-patch16-224"
-  siglip_threshold: null       # CALIBRATE Phase 3 on 10 hand-picked pairs; recorded in BUILDLOG
+  siglip_threshold: 0.045      # calibrated Phase 3: good pairs ≥0.0781, bad ≤0.0128 (BUILDLOG)
   max_per_beat: 3
   cache_db: "cache/media.db"
 

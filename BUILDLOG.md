@@ -52,3 +52,20 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Gate: `runs/phase2_test/words.json`** — 86 words with per-word ms timestamps + probabilities, sanity checks green. pytest: 49 passed.
 
 **Evidence:** `runs/phase2_test/words.json`, `runs/phase2_test/words_fw_base.json`, `runs/phase2_test/words_whisperx.json`, benchmark output in session log.
+
+---
+
+## PHASE 3 — ASSET ENGINE
+**Status: ✅ PASS** — 2026-07-12
+
+- Modules: [sources.py](vulcan/assets/sources.py) (waterfall), [stamp.py](vulcan/assets/stamp.py) (rembg isnet-general-use → largest-component cleanup → autocrop → 12px stroke + shadow), [scorer.py](vulcan/assets/scorer.py) (SigLIP base CPU), [cache.py](vulcan/assets/cache.py) (media.db + embedding similarity lookup), [engine.py](vulcan/assets/engine.py) (orchestration).
+- **Source swaps (dead-source rule):**
+  - `duckduckgo_search` → `ddgs` (renamed upstream); DDG's own image API 403s but ddgs transparently falls back to Bing images — works.
+  - 3dicons.co & LottieFiles are JS-walled → **3d_icon + emoji = Microsoft fluentui-emoji 3D** (MIT, raw.githubusercontent, deterministic URL from unicode name, verified: fire/rocket/brain/money bag/tears-of-joy all 200). Apple emoji sources max at 160px (checked emojipedia CDN + iamcal); fluent 3D ships 256px → Lanczos-upscaled to 512 (smooth-shaded art upscales cleanly). **lottie deferred: not in v1 menus** (emoji_burst + 3d_icon cover the need); plumbing kept.
+  - Kenney.nl zips are JS-gated → **SFX synthesized instead** (see Phase 4 entry).
+- **Crashes found & fixed:** (1) `cairosvg` import segfaults the process (native lib clash with onnxruntime/torch) → SVG rasterization isolated into a subprocess; (2) PIL `MaxFilter(1)` segfaults C layer when stroke_px=0 → guarded. Both were silent process deaths — found via core dumps.
+- **Eye-check iteration (the gate doing its job):** first sheet had 2 failures invisible to scores: Eiffel = lightning-storm photo shredded by rembg (fix: `keep_largest_component` — reject cutouts whose largest connected alpha component < 75% of mass); GitHub = black octocat on near-black canvas (fix: `mean_luma < 0.22` → refetch iconify mono sets with `color=white`, reject dark rasters). Re-run: both post-grade.
+- **SigLIP threshold calibrated on 10 good + 10 bad pairs** from the gate assets: good ∈ [0.0781, 0.1646], bad ∈ [−0.0706, 0.0128], gap 0.065. **Threshold = 0.045** → config.yaml. Policy: mandatory for search-sourced candidates (ddg/wikimedia); advisory for name-exact sources (iconify/fluent) whose relevance is guaranteed by lookup.
+- **Gate: 8/8 queries validated across all types → contact sheet VIEWED, all post-grade** (`runs/phase3_gate/contact_sheet.png`). Cache verified: re-run hits media.db by embedding similarity, zero network.
+
+**Evidence:** `runs/phase3_gate/contact_sheet.png` (+ per-asset PNGs), calibration table in session log, `cache/media.db`.

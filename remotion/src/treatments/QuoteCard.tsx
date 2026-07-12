@@ -7,8 +7,9 @@ import React from 'react';
 import {AbsoluteFill, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Tokens} from '../tokens';
 import type {Beat} from '../types';
+import type {AssetMap} from './common';
 
-export const QuoteCard: React.FC<{beat: Beat; assets: unknown; tokens: Tokens}> = ({beat, tokens}) => {
+export const QuoteCard: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> = ({beat, tokens}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const quote = beat.payload?.quote;
