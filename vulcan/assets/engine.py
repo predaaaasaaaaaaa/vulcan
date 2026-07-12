@@ -27,6 +27,31 @@ log = logging.getLogger("vulcan.assets")
 DOWNLOAD_CAP_BYTES = 12 * 1024 * 1024
 SEARCH_GATED_SOURCES = ("ddg", "wikimedia")  # SigLIP mandatory for these
 
+# Stage-4 runaway guards (post-mortem 2026-07-12: one asset burned 34 attempts
+# and 16 minutes on a rate-limited network before anyone gave up):
+MAX_ATTEMPTS_PER_ASSET = 10      # candidates actually downloaded/stamped/scored
+PER_ASSET_BUDGET_S = 75          # wall-clock cap per asset
+NETWORK_TRIP_THRESHOLD = 6       # consecutive network errors across the stage → degraded
+
+_NETWORK_ERRORS = (httpx.TimeoutException, httpx.TransportError, httpx.ConnectError)
+
+
+class _Breaker:
+    """Stage-wide circuit breaker: when the network is clearly degraded, stop
+    burning minutes — remaining assets fail fast and their beats degrade to
+    kinetic_type (the render must ship)."""
+
+    def __init__(self) -> None:
+        self.consecutive = 0
+        self.tripped = False
+
+    def record(self, ok: bool) -> None:
+        self.consecutive = 0 if ok else self.consecutive + 1
+        if self.consecutive >= NETWORK_TRIP_THRESHOLD and not self.tripped:
+            self.tripped = True
+            log.warning("network circuit breaker TRIPPED after %d consecutive failures — "
+                        "remaining assets fail fast", self.consecutive)
+
 
 def _download(url: str) -> bytes:
     with httpx.Client(headers={"User-Agent": UA}, timeout=httpx.Timeout(25.0, connect=8.0),
@@ -53,21 +78,40 @@ def _score_phrase(asset: dict, query: str) -> str:
     return query
 
 
-def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = None) -> dict:
+def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = None,
+                  breaker: "_Breaker | None" = None) -> dict:
     """Fetch/validate one manifest asset in place. Returns the mutated dict.
 
     Sets status=validated + path + score on success; status=failed with
-    _failure_log on exhaustion (Director Pass C can then swap the treatment).
+    _failure_log on exhaustion (the CLI then degrades its beats). Bounded by
+    MAX_ATTEMPTS_PER_ASSET, PER_ASSET_BUDGET_S and the stage circuit breaker.
     """
     if threshold is None:
         threshold = config.get("assets.siglip_threshold") or 0.06
+    breaker = breaker or _Breaker()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     failures: list[str] = []
+    attempts = 0
+    started = time.monotonic()
+
+    def budget_left() -> bool:
+        if breaker.tripped:
+            failures.append("network degraded — circuit breaker tripped")
+            return False
+        if attempts >= MAX_ATTEMPTS_PER_ASSET:
+            failures.append(f"attempt cap reached ({MAX_ATTEMPTS_PER_ASSET})")
+            return False
+        if time.monotonic() - started > PER_ASSET_BUDGET_S:
+            failures.append(f"time budget exceeded ({PER_ASSET_BUDGET_S}s)")
+            return False
+        return True
 
     from .scorer import relevance, text_embedding
 
     for query in asset["queries"]:
+        if not budget_left():
+            break
         phrase = _score_phrase(asset, query)
 
         # 1) cache first — recurring topics compound
@@ -83,6 +127,9 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
 
         # 2) source waterfall
         for cand in candidates_for(asset["type"], query):
+            if not budget_left():
+                break
+            attempts += 1
             tag = hashlib.sha1(cand.url.encode()).hexdigest()[:10]
             out_path = out_dir / f"{asset['asset_id']}_{tag}.png"
             try:
@@ -119,26 +166,37 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
                 media_cache.add(query, asset["type"], cand.source, out_path, score,
                                 img_emb, info["width"], info["height"])
                 log.info("resolved %s %r via %s (score %.3f)", asset["asset_id"], query, cand.source, score)
+                breaker.record(ok=True)
                 return asset
+            except _NETWORK_ERRORS as e:
+                failures.append(f"{cand.source} {cand.url[:80]}: NETWORK {type(e).__name__}")
+                out_path.unlink(missing_ok=True)
+                breaker.record(ok=False)
+                continue
             except Exception as e:
                 failures.append(f"{cand.source} {cand.url[:80]}: {e}")
                 out_path.unlink(missing_ok=True)
+                breaker.record(ok=True)  # content rejection, not network trouble
                 continue
         time.sleep(0.4)  # be polite between query variants
 
     asset["status"] = "failed"
     asset["_failure_log"] = failures[-12:]
-    log.warning("asset %s FAILED after %d attempts", asset["asset_id"], len(failures))
+    log.warning("asset %s FAILED after %d attempts (%s)", asset["asset_id"], attempts,
+                failures[-1] if failures else "no candidates")
     return asset
 
 
 def resolve_all(manifest: dict, out_dir: str | Path) -> tuple[dict, list[str]]:
-    """Resolve every asset. Returns (manifest, list of failed asset_ids)."""
+    """Resolve every asset with a shared circuit breaker. Returns
+    (manifest, failed asset_ids). Worst case is bounded: assets × 75s, and a
+    degraded network trips the breaker long before that."""
     failed = []
+    breaker = _Breaker()
     for asset in manifest["assets"]:
         if asset["status"] == "validated" and asset.get("path") and Path(asset["path"]).exists():
             continue
-        resolve_asset(asset, out_dir)
+        resolve_asset(asset, out_dir, breaker=breaker)
         if asset["status"] != "validated":
             failed.append(asset["asset_id"])
     return manifest, failed

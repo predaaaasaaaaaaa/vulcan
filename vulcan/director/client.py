@@ -21,6 +21,10 @@ class DirectorError(RuntimeError):
     pass
 
 
+class QuotaExhausted(DirectorError):
+    """Provider plan/credits exhausted — NOT transient, retrying is waste."""
+
+
 def chat(system: str, user: str, max_tokens: int | None = None,
          temperature: float | None = None) -> str:
     cfg = config.load()["director"]
@@ -42,6 +46,13 @@ def chat(system: str, user: str, max_tokens: int | None = None,
         try:
             with httpx.Client(timeout=httpx.Timeout(cfg.get("timeout_s", 240), connect=15)) as c:
                 r = c.post(url, headers=headers, json=body)
+            if r.status_code == 429 and any(
+                    m in r.text.lower() for m in ("usage limit", "credit", "quota", "token plan")):
+                # plan exhausted (observed live 2026-07-12, MiniMax error 2056)
+                # — retrying a quota error just burns minutes
+                raise QuotaExhausted(
+                    "MINIMAX_QUOTA exhausted — the MiniMax Token Plan is out of "
+                    f"credits; upgrade the plan or wait for reset. ({r.text[:160]})")
             if r.status_code in (429, 500, 502, 503, 529):
                 raise DirectorError(f"transient {r.status_code}: {r.text[:200]}")
             r.raise_for_status()
@@ -51,6 +62,8 @@ def chat(system: str, user: str, max_tokens: int | None = None,
             if not text:
                 raise DirectorError(f"empty completion: {json.dumps(data)[:300]}")
             return text
+        except QuotaExhausted:
+            raise  # not transient — surface immediately
         except (httpx.TimeoutException, httpx.TransportError, DirectorError) as e:
             last_err = e
             wait = 2 ** attempt * 3

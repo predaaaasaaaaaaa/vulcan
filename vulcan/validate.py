@@ -123,7 +123,9 @@ def validate_manifest(
         blen = b["end_ms"] - b["start_ms"]
 
         # --- Beat length ---
-        if blen < beat_min_ms or blen > beat_max_ms:
+        # Single-word beats may exceed max: the overrun is inter-word silence
+        # the tiling had to park somewhere (unsplittable; captions just hold).
+        if blen < beat_min_ms or (blen > beat_max_ms and len(b["words"]) > 1):
             errs.append(
                 f"E_BEAT_LEN {bid} is {blen}ms; must be {beat_min_ms}-{beat_max_ms}ms"
             )

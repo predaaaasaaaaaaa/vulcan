@@ -62,14 +62,23 @@ def master(voice_path: str | Path, out_dir: str | Path, target_lufs: float = -14
     denoised = out_dir / "denoised.wav"
     mastered = out_dir / "mastered.wav"
 
-    # Pass 0: decode + light broadband denoise + gentle 3:1 compression.
-    # nr=12 is gentle — voice notes are phone-mic recordings; heavier NR smears
-    # consonants and hurts ASR. The compressor tames peaks so the linear
-    # loudnorm below can actually reach the target without hitting the TP cap.
+    # Pass 0: decode + light broadband denoise + SILENCE CAP + gentle 3:1
+    # compression. nr=12 is gentle — voice notes are phone-mic recordings;
+    # heavier NR smears consonants and hurts ASR. The silence cap trims any
+    # internal pause beyond ~0.9s: long dead air is unwatchable in short-form
+    # AND breaks beat math (a real 9.15s pause made a single-word beat span
+    # >5s — unrepairable by cutting; see post-mortem 2026-07-12). ASR runs on
+    # this same mastered track, so the timeline stays consistent everywhere.
+    # The compressor tames peaks so the linear loudnorm below can actually
+    # reach the target without hitting the TP cap.
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(voice_path),
         "-ac", "1", "-ar", str(TARGET_SR),
-        "-af", "afftdn=nr=12:nf=-28,acompressor=threshold=-18dB:ratio=3:attack=5:release=120:makeup=4dB",
+        "-af", (
+            "afftdn=nr=12:nf=-28,"
+            "silenceremove=stop_periods=-1:stop_duration=0.9:stop_threshold=-38dB,"
+            "acompressor=threshold=-18dB:ratio=3:attack=5:release=120:makeup=4dB"
+        ),
         str(denoised),
     ])
 

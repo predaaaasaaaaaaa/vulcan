@@ -55,16 +55,23 @@ def cuts_to_beats(words: list[dict], cut_indices: list[int], duration_ms: int) -
 
 
 def beat_length_problems(beats: list[dict], min_ms: int = MIN_BEAT_MS, max_ms: int = MAX_BEAT_MS) -> list[str]:
-    """Human-readable length violations for retry injection."""
+    """Human-readable length violations for retry injection.
+
+    A single-word beat over max_ms is tolerated: its overrun is pure silence
+    (tiling must put inter-word silence somewhere), it cannot be cut, and the
+    renderer just holds the caption. The ingest silence cap makes this rare;
+    when it happens it is structurally unfixable and visually harmless.
+    """
     problems = []
     for i, b in enumerate(beats):
         length = b["end_ms"] - b["start_ms"]
+        single_word = b["last_word"] <= b["first_word"]
         if length < min_ms:
             problems.append(
                 f"beat {i + 1} (words {b['first_word']}-{b['last_word']}) is {length}ms — too short, "
                 f"merge it with a neighbor (min {min_ms}ms)"
             )
-        elif length > max_ms:
+        elif length > max_ms and not single_word:
             problems.append(
                 f"beat {i + 1} (words {b['first_word']}-{b['last_word']}) is {length}ms — too long, "
                 f"add a cut between words {b['first_word']} and {b['last_word']} (max {max_ms}ms)"
@@ -82,49 +89,91 @@ def repair_cuts(words: list[dict], cut_indices: list[int], duration_ms: int,
                 min_ms: int = MIN_BEAT_MS, max_ms: int = MAX_BEAT_MS) -> list[int]:
     """Deterministically fix beat-length violations in a cut set.
 
-    Too-long beats get extra cuts at their largest internal silence gaps
-    (falling back to the word nearest the midpoint); too-short beats get
-    merged into the shorter neighbor. The LLM chooses ideas; math fixes
-    lengths. Iterates to a fixed point.
+    The LLM chooses ideas; math fixes lengths. Rewritten after the 2026-07-12
+    post-mortem: the previous greedy multi-cut recomputed split targets from a
+    stale beat start each round, so `set.add` kept hitting existing cuts and
+    the loop spun without converging. This version is provably terminating:
+
+      Phase 1 (split): while any too-long beat exists, add exactly ONE new cut
+      inside it — the candidate is scored (a) both sides ≥ min_ms first,
+      (b) largest silence gap, (c) most balanced. Each iteration either adds a
+      strictly new cut (bounded by word count) or marks the beat unsplittable
+      (single word — bounded by beat count).
+
+      Phase 2 (merge): each too-short beat merges into its shorter neighbor,
+      removing exactly one cut per iteration (bounded by cut count). A merge
+      that would re-create a too-long beat prefers the other neighbor, else
+      tolerates the short beat rather than ping-ponging.
+
+    Up to 3 rounds of (split, merge) — in practice one converges, because the
+    ingest silence cap (≤0.9s pauses) + the ASR word-length ceiling (≤3s)
+    make every >max beat splittable with legal sides.
     """
     cuts = sanitize_cuts(cut_indices, len(words))
+    unsplittable: set[int] = set()
+    tolerated_short: set[int] = set()
 
-    for _ in range(40):  # fixed-point iteration, bounded
+    for _round in range(3):
+        # ---- Phase 1: split all too-long beats, one new cut at a time ----
+        for _ in range(len(words) + len(cuts) + 8):
+            beats = cuts_to_beats(words, cuts, duration_ms)
+            target = next(
+                (b for b in beats
+                 if b["end_ms"] - b["start_ms"] > max_ms
+                 and b["first_word"] not in unsplittable),
+                None,
+            )
+            if target is None:
+                break
+            lo, hi = target["first_word"], target["last_word"]
+            if hi <= lo:
+                unsplittable.add(lo)  # single word — cannot cut
+                continue
+            candidates = []
+            for i in range(lo, hi):
+                b_ms = boundary_ms(words, i)
+                left = b_ms - target["start_ms"]
+                right = target["end_ms"] - b_ms
+                gap = words[i + 1]["s"] - words[i]["e"]
+                candidates.append((left >= min_ms and right >= min_ms, gap, -abs(left - right), i))
+            candidates.sort(reverse=True)
+            chosen = candidates[0][3]
+            if chosen in cuts:  # geometry left nothing new — stop touching this beat
+                unsplittable.add(lo)
+                continue
+            cuts = sorted(set(cuts) | {chosen})
+
+        # ---- Phase 2: merge too-short beats, one cut removed at a time ----
+        merged_any = False
+        for _ in range(len(cuts) + 4):
+            beats = cuts_to_beats(words, cuts, duration_ms)
+            short_i = next(
+                (i for i, b in enumerate(beats)
+                 if b["end_ms"] - b["start_ms"] < min_ms
+                 and b["first_word"] not in tolerated_short),
+                None,
+            )
+            if short_i is None or not cuts:
+                break
+            blen = lambda i: beats[i]["end_ms"] - beats[i]["start_ms"]  # noqa: E731
+            options = []  # (resulting_len, cut_to_drop)
+            if short_i > 0:
+                options.append((blen(short_i - 1) + blen(short_i), cuts[short_i - 1]))
+            if short_i < len(beats) - 1:
+                options.append((blen(short_i + 1) + blen(short_i), cuts[short_i]))
+            legal = [o for o in options if o[0] <= max_ms]
+            pick = min(legal or options)  # prefer a legal merge, else smallest overshoot
+            if not legal and pick[0] > max_ms:
+                # merging would re-create a long beat → tolerate the short one
+                tolerated_short.add(beats[short_i]["first_word"])
+                continue
+            cuts = [c for c in cuts if c != pick[1]]
+            merged_any = True
+
         beats = cuts_to_beats(words, cuts, duration_ms)
-        # merge too-short beats first (changes lengths of neighbors)
-        short = next((i for i, b in enumerate(beats)
-                      if b["end_ms"] - b["start_ms"] < min_ms), None)
-        if short is not None:
-            if len(beats) == 1:
-                break  # single short beat — nothing to merge, let validator speak
-            # remove the boundary shared with the shorter neighbor
-            if short == 0:
-                drop = cuts[0]
-            elif short == len(beats) - 1:
-                drop = cuts[-1]
-            else:
-                left = beats[short - 1]["end_ms"] - beats[short - 1]["start_ms"]
-                right = beats[short + 1]["end_ms"] - beats[short + 1]["start_ms"]
-                drop = cuts[short - 1] if left <= right else cuts[short]
-            cuts = [c for c in cuts if c != drop]
-            continue
+        if not beat_length_problems(beats, min_ms, max_ms) or not merged_any:
+            break
 
-        long_i = next((i for i, b in enumerate(beats)
-                       if b["end_ms"] - b["start_ms"] > max_ms), None)
-        if long_i is None:
-            return cuts
-        b = beats[long_i]
-        lo, hi = b["first_word"], b["last_word"]
-        if hi <= lo:
-            break  # single word longer than max — impossible to cut
-        # best internal cut: largest silence gap, else word closest to midpoint
-        internal = range(lo, hi)  # cut AFTER these words stays inside the beat
-        gaps = [(words[i + 1]["s"] - words[i]["e"], i) for i in internal]
-        best_gap, best_i = max(gaps)
-        if best_gap < 120:
-            mid = (b["start_ms"] + b["end_ms"]) / 2
-            best_i = min(internal, key=lambda i: abs(words[i]["e"] - mid))
-        cuts = sorted(set(cuts) | {best_i})
     return cuts
 
 

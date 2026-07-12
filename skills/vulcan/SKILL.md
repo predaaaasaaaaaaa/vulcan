@@ -1,7 +1,7 @@
 ---
 name: vulcan
 description: "Forge a voice note into a publish-ready vertical video (1080×1920, kinetic captions, cutouts, SFX, frame-synced to the voice) and deliver it back on Telegram with a post kit. Use when the user sends a voice note asking for a video/reel/short, says 'forge this', 'make this a video', 'vulcan', or asks to clean up after taking a video."
-version: 1.1.0
+version: 1.2.0
 metadata:
   hermes:
     tags: [video, content, telegram, voice, reels, shorts]
@@ -45,20 +45,29 @@ inside). One run takes **2–10 minutes** depending on note length.
 - ONE run at a time. If a run is in progress, say so instead of starting another.
 
 You never need the voice file's path. The gateway caches incoming notes to
-`~/.hermes/cache/audio/*.ogg`; `run --latest` finds the newest one **that has
-not been forged before** (VULCAN keeps a consumed-notes ledger at
-`runs/.consumed.json`, so re-running can never accidentally re-forge an old
-message — if the user wants the SAME note redone, they must re-send it, or
-you pass the explicit file path from `runs/<old_id>/audio/input.ogg`... which
-only exists until cleanup).
+`~/.hermes/cache/audio/*.ogg` (or the legacy `~/.hermes/audio_cache/`);
+`run --latest` finds the newest one **that has not been forged before**
+(consumed-notes ledger at `runs/.consumed.json` — re-running can never
+accidentally re-forge an old message).
+
+**INPUT LAW — burned once, now enforced:** when a voice note just arrived,
+the invocation is ALWAYS `run --latest`. NEVER hunt the filesystem for audio
+yourself and NEVER pass a path from inside `runs/` — those are OUTPUTS of
+past runs (a stale `runs/*/audio/mastered.wav` got re-forged 3 times in one
+session while the user's fresh note sat in the cache). The CLI now refuses
+`runs/` inputs outright. If you must forge a specific old file, stage a copy
+under `/home/preda/vulcan/inbox/` and pass that path. To redo the SAME note:
+ask the user to re-send it.
 
 ## 3. How to invoke (exact mechanics)
 
-The run outlives your terminal tool's timeout (180s). ALWAYS run it in the
-background and poll:
+The run outlives your terminal tool's timeout (a run is 2–10 min; stage 4 is
+budgeted at ≤75s per asset with a network circuit breaker, so a hung run no
+longer exists — if the log hasn't moved in 3 minutes, treat it as dead).
+ALWAYS run it in the background and poll:
 
 ```bash
-# start (backgrounded, output captured):
+# start (backgrounded, output captured) — this exact line, nothing fancier:
 nohup /home/preda/vulcan/bin/vulcan run --latest > /tmp/vulcan_run.log 2>&1 &
 
 # poll every ~30s (cheap, non-blocking):
@@ -69,6 +78,18 @@ tail -5 /tmp/vulcan_run.log
 
 If your harness has a dedicated background-process tool, prefer it over
 `nohup` — same contract: start, poll the output file, react to DONE/ERROR.
+
+**ALWAYS use `/home/preda/vulcan/bin/vulcan`** — never `python3 -m vulcan.cli`
+(the system python lacks the deps; the wrapper pins the project venv; the CLI
+now fails fast with the fix if you get this wrong).
+
+**Killing a stuck run (rare):** run the kill as its OWN command, never chained
+before a new launch (a chained `pkill -f vulcan && nohup vulcan…` matches its
+own command line and kills itself):
+
+```bash
+pkill -9 -f "vulcan\.cli run"    # then wait 2s, verify with: pgrep -af vulcan.cli
+```
 
 ## 4. Output protocol (what the CLI prints and what you do with it)
 
@@ -85,6 +106,11 @@ If your harness has a dedicated background-process tool, prefer it over
 
 **Delivery order:** 1) video (`MEDIA:` line) → 2) post-kit text → 3) nothing
 else unless asked.
+
+The post kit also lives on disk at `runs/<RUN_ID>/post_kit.json` (and inside
+`manifest.json` under `"post_kit"`) — if you ever need it after the fact,
+read it from there; do not declare it "missing" because no file matches
+`*postkit*`.
 
 ## 5. Worked example (happy path)
 
@@ -135,6 +161,7 @@ line before the error; report the message; attach nothing; retry at most ONCE
 | 6/7 qc | "⚠️ The video came out below the quality bar and auto-repair didn't save it. Artifacts kept for debugging." |
 | 7/7 deliver | send the path in plain text: "Video ready at `runs/<id>/out/final.mp4` but Telegram delivery failed — possibly over 50MB." |
 | `ERROR no unconsumed voice note…` | "⚠️ I couldn't find a NEW voice note — the last one was already forged. Send a fresh one and say 'forge this'." |
+| `ERROR … MINIMAX_QUOTA …` | "⚠️ The MiniMax plan is out of credits — the director brain can't run. Top up / upgrade the MiniMax Token Plan (or wait for the reset), then re-send the note." **Do NOT retry — it's a quota, not a glitch.** |
 
 For any failure: `runs/<RUN_ID>/pipeline.log` holds the full forensic story —
 quote its last lines if the user asks what happened.
@@ -151,6 +178,13 @@ platform-agnostic. Full integration guide: `/home/preda/vulcan/README.md` §6.
 ## 9. Hard rules
 
 - ONE run at a time; never edit files under `/home/preda/vulcan` (invoke the CLI only).
+- **You are the relay, not the mechanic.** NEVER `pip install` anything, NEVER
+  patch VULCAN's code, prompts, or `config.yaml`, NEVER "fix" the pipeline —
+  even when you can see the bug. Report the failure with the last 20 lines of
+  `runs/<id>/pipeline.log` and stop. (A live session where the operator
+  patched code and config mid-run produced a broken threshold and a
+  non-converging algorithm — the maintainer had to revert both.)
+- Input law: fresh note → `run --latest`; never feed `runs/` paths back in.
 - Never send intermediate artifacts unless asked.
 - Never retry more than once per failure.
 - Cleanup only after approval; purge only on explicit request.

@@ -80,11 +80,15 @@ def test_unknown_sfx_cue_passes_assembly_fails_validation():
     assert any("E_SFX_UNKNOWN" in e for e in errs)
 
 def test_asset_dedup_by_label():
+    # same (type,label) requested twice → one asset id (second ref rides along)
     out = b_out()
-    out["beats"][1]["assets"] = [{"label": "iphone", "type": "photo_cutout", "role": "hero",
-                                  "queries": ["iphone 15"], "enter_word": 6}]
+    out["beats"][0]["assets"].append({"label": "iphone", "type": "photo_cutout",
+                                      "role": "secondary", "queries": ["iphone 15"],
+                                      "enter_word": 0})
     m = assemble(out)
-    assert len(m["assets"]) == 1  # same (type,label) → one asset id
+    assert len(m["assets"]) == 1
+    assert len(m["beats"][0]["assets"]) == 2
+    assert m["beats"][0]["assets"][0]["asset_id"] == m["beats"][0]["assets"][1]["asset_id"]
 
 def test_full_manifest_validates():
     from vulcan.validate import validate_manifest

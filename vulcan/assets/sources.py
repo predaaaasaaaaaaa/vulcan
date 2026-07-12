@@ -99,7 +99,9 @@ def ddg_images(query: str, transparent: bool = False, max_results: int = 8) -> l
         kwargs = {"safesearch": "moderate", "size": "Large", "max_results": max_results + 6}
         if transparent:
             kwargs["type_image"] = "transparent"
-        with DDGS() as ddgs:
+        # 10s search budget: on a rate-limited network every backend times out
+        # slowly — better to fail this source fast and let the waterfall move
+        with DDGS(timeout=10) as ddgs:
             results = list(ddgs.images(query, **kwargs))
         out = []
         for r in results:

@@ -14,7 +14,7 @@ from .. import config
 from ..beats import (beat_length_problems, clamp_asset_enter, cuts_to_beats,
                      repair_cuts, silence_gaps)
 from ..validate import load_sfx_cues, validate_manifest
-from .client import DirectorError, chat, extract_json
+from .client import DirectorError, QuotaExhausted, chat, extract_json
 
 log = logging.getLogger("vulcan.director")
 
@@ -77,6 +77,8 @@ def pass_a(words: list[dict], duration_ms: int) -> list[dict]:
                 log.info("pass A: repaired cuts %s → %s", cuts, repaired)
             log.info("pass A ok: %d beats (attempt %d)", len(skeleton), attempt + 1)
             return skeleton
+        except QuotaExhausted:
+            raise
         except (ValueError, DirectorError) as e:
             log.warning("pass A attempt %d rejected: %s", attempt + 1, e)
             feedback = (
@@ -100,6 +102,35 @@ def _beat_table(skeleton: list[dict], words: list[dict]) -> str:
 def _norm(w: str) -> str:
     # no apostrophes in the normal form — ’ vs ' must not break matching
     return re.sub(r"[^\w-]", "", w, flags=re.UNICODE).lower()
+
+
+_STOPWORDS = {
+    "the", "a", "an", "of", "to", "and", "or", "in", "on", "for", "with", "at",
+    "photo", "image", "picture", "png", "cutout", "portrait", "shot", "close",
+    "up", "closeup", "view", "background", "transparent", "isolated", "hd",
+    "le", "la", "les", "un", "une", "des", "de", "du", "et", "ou", "en", "sur",
+}
+
+
+def _literal_types_overlap(asset_label: str, queries: list[str], beat_words: list[dict]) -> bool:
+    """True when the asset request references something actually SPOKEN in the
+    beat. Guards rule 12 deterministically: 'large black bull portrait' on a
+    beat about bankruptcy shares no token with the words → rejected. Loose
+    stem match (5-char prefix) tolerates inflections (grape/grapes,
+    croissance/croissante)."""
+    spoken = {_norm(w["w"]) for w in beat_words}
+    spoken.discard("")
+    asked = set()
+    for text in [asset_label, *queries]:
+        for tok in re.split(r"\s+", str(text)):
+            t = _norm(tok)
+            if len(t) >= 3 and t not in _STOPWORDS:
+                asked.add(t)
+    for a in asked:
+        for s in spoken:
+            if a == s or (len(a) >= 5 and len(s) >= 5 and a[:5] == s[:5]):
+                return True
+    return False
 
 
 def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
@@ -193,6 +224,13 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
             queries = [str(q)[:80] for q in (a.get("queries") or []) if str(q).strip()][:3]
             if not queries:
                 slip(f"{bid}: asset '{a.get('label')}' has no queries")
+                continue
+            # rule-12 law: literal imagery must reference something SPOKEN.
+            # Symbolic types (emoji/icons) stay free — that's their job.
+            if atype in ("photo_cutout", "screenshot", "logo") and not _literal_types_overlap(
+                    str(a.get("label") or ""), queries, beat_words):
+                slip(f"{bid}: asset '{a.get('label')}' ({atype}) references nothing spoken in this beat "
+                     f"— for abstract lines use kinetic_type or emoji_burst instead (rule 12)")
                 continue
             key = (atype, _norm(str(a.get("label") or queries[0])))
             if key not in assets_registry:
@@ -327,6 +365,8 @@ def pass_b(video_id: str, audio_path: str, duration_ms: int,
                      len(manifest["beats"]), len(manifest["assets"]), attempt + 1,
                      ", lenient" if lenient and notes else "")
             return manifest
+        except QuotaExhausted:
+            raise
         except (ValueError, DirectorError) as e:
             log.warning("pass B attempt %d rejected: %s", attempt + 1, str(e)[:300])
             feedback = (
@@ -484,12 +524,25 @@ def pass_d(transcript: str) -> dict:
             if not hook or not caption or len(tags) != 5:
                 raise ValueError("need hook, caption and exactly 5 hashtags")
             return {"hook": hook, "caption": caption, "hashtags": tags}
+        except QuotaExhausted:
+            raise
         except (ValueError, DirectorError) as e:
             feedback = f"\nYOUR PREVIOUS ANSWER WAS REJECTED: {e}\nOutput corrected JSON.\n"
     raise DirectorError("pass D failed")
 
 
 # ------------------------------------------------------------------ full chain
+
+def fallback_post_kit(transcript: str) -> dict:
+    """Deterministic post kit when pass D exhausts retries — a plain kit must
+    never cost the user a fully rendered video."""
+    first = re.split(r"(?<=[.!?])\s+", transcript.strip())[0][:110] if transcript.strip() else "New video"
+    return {
+        "hook": first,
+        "caption": "Watch till the end 👀\nWhat do you think? Drop it below 👇",
+        "hashtags": ["#shorts", "#reels", "#fyp", "#viral", "#learnontiktok"],
+    }
+
 
 def direct(video_id: str, words_data: dict, audio_path: str = "mastered.wav") -> dict:
     """words.json content → validated manifest (assets still pending) + post_kit."""
@@ -498,7 +551,11 @@ def direct(video_id: str, words_data: dict, audio_path: str = "mastered.wav") ->
     manifest = pass_b(video_id, audio_path, duration, skeleton, words,
                       language=words_data.get("language", "en"))
     manifest = pass_c(manifest, words)
-    manifest["post_kit"] = pass_d(words_data.get("text", ""))
+    try:
+        manifest["post_kit"] = pass_d(words_data.get("text", ""))
+    except DirectorError as e:
+        log.warning("pass D failed (%s) — using deterministic fallback kit", e)
+        manifest["post_kit"] = fallback_post_kit(words_data.get("text", ""))
     errs = validate_manifest(manifest)
     if errs:
         raise DirectorError(f"final manifest invalid after pass C/D: {errs[:5]}")

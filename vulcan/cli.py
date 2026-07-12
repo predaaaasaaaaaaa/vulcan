@@ -101,6 +101,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not voice.exists():
         print(f"ERROR voice file not found: {voice}")
         return 2
+    # The stale-input trap (post-mortem 2026-07-12: an old run's mastered.wav
+    # got re-forged 3 times while the user's fresh note sat in the cache):
+    # run dirs are OUTPUTS. Never accept them as inputs unless forced.
+    try:
+        inside_runs = voice.resolve().is_relative_to(RUNS_DIR.resolve())
+    except AttributeError:  # py<3.9 fallback, not expected
+        inside_runs = str(RUNS_DIR.resolve()) in str(voice.resolve())
+    if inside_runs and not getattr(args, "force", False):
+        print(f"ERROR input is a PREVIOUS RUN's artifact ({voice}). Use 'run --latest' "
+              "for the newest voice note, or pass the original file (e.g. from "
+              "~/vulcan/inbox/). Override only if you're sure: --force")
+        return 2
     consumed_from_cache = args.latest
 
     video_id = f"v_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -133,6 +145,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         status(f"3/7 director — {len(words['words'])} words → beats + treatments (MiniMax)")
         manifest = direct(video_id, words)
         (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
+        if manifest.get("post_kit"):
+            # standalone copy so any agent can find the kit without parsing the manifest
+            (run_dir / "post_kit.json").write_text(
+                json.dumps(manifest["post_kit"], indent=1, ensure_ascii=False))
 
         status(f"4/7 assets — resolving {len(manifest['assets'])} assets")
         manifest, failed = resolve_all(manifest, run_dir / "assets")
@@ -300,6 +316,18 @@ def cmd_doctor(_: argparse.Namespace) -> int:
 
 
 def main() -> None:
+    # Wrong-interpreter trap (post-mortem: `python3 -m vulcan.cli` used the
+    # system python, missing all deps, and the run died mid-pipeline with a
+    # bare ModuleNotFoundError). Fail fast with the exact fix.
+    try:
+        import faster_whisper  # noqa: F401
+        import jsonschema  # noqa: F401
+    except ImportError as e:
+        print(f"ERROR missing dependency ({e.name}) — you are running the wrong Python "
+              f"({sys.executable}). Invoke VULCAN via /home/preda/vulcan/bin/vulcan "
+              "(it pins the project venv).")
+        sys.exit(2)
+
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
                         datefmt="%H:%M:%S")
@@ -310,6 +338,8 @@ def main() -> None:
     p_run.add_argument("voice", nargs="?", help="path to voice file (ogg/mp3/m4a/wav)")
     p_run.add_argument("--latest", action="store_true",
                        help="use the newest Telegram voice note from the Hermes cache")
+    p_run.add_argument("--force", action="store_true",
+                       help="allow re-forging a previous run's artifact (normally refused)")
     p_run.set_defaults(fn=cmd_run)
 
     p_st = sub.add_parser("status", help="show stage artifacts for a run")

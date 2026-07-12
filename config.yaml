@@ -35,7 +35,13 @@ beats:
 assets:
   min_edge_px: 500
   siglip_model: "google/siglip-base-patch16-224"
-  siglip_threshold: 0.30      # tightened post-run: 0.045 floor let 0.114 ("bull" on abstract topic) pass — now 0.30 rejects anything force-fit
+  # 0.05: calibrated range is good ≥0.078 / bad ≤0.013 (BUILDLOG Phase 3) — the 0.30
+  # floor tried post-run would also reject EVERY correct match (best good pair ever
+  # measured: 0.168) and silently disable the asset engine. The "bull on abstract
+  # topic" failure was a QUERY-choice error, not a scoring error (0.114 was a
+  # correct match for the bull query): fixed at the source by pass_b rule 12 + the
+  # deterministic spoken-word overlap guard in director/passes.py.
+  siglip_threshold: 0.05
   max_per_beat: 3
   cache_db: "cache/media.db"
 
