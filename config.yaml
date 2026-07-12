@@ -44,7 +44,7 @@ render:
   width: 1080
   height: 1920
   crf: 23                      # tuned Phase 4 so 3min <= 45MB
-  concurrency: null            # CALIBRATE Phase 4 (RAM-bound, see RECON §3); null = remotion default
+  concurrency: 4               # calibrated Phase 4: 62s render in 77s, RAM stable (BUILDLOG)
   timeout_min: 30
 
 qc:

@@ -81,16 +81,21 @@ export const Captions: React.FC<{
   );
   if (groups.length === 0) return null;
 
-  // active group: last group whose startMs <= now (holds through silence)
+  // active group: last group whose startMs <= now. Before the first word the
+  // FIRST group is already displayed (dim) — captions are always on; a beat
+  // that opens with silence must never show an empty frame (QC dead-frame
+  // rule found this on the golden run).
   let gi = 0;
   for (let i = 0; i < groups.length; i++) {
     if (nowMs >= groups[i].startMs) gi = i;
   }
   const group = groups[gi];
-  if (nowMs < groups[0].startMs - 150) return null; // brief lead-in silence
+  const preFirstGroup = nowMs < groups[0].startMs;
 
-  // group entrance spring, restarted per group (frame of group start)
-  const groupStartFrame = Math.round(((group.startMs - beat.start_ms) / 1000) * fps);
+  // group entrance spring, restarted per group (beat start for the lead-in)
+  const groupStartFrame = preFirstGroup
+    ? 0
+    : Math.round(((group.startMs - beat.start_ms) / 1000) * fps);
   const enter = spring({
     frame: frame - groupStartFrame,
     fps,
@@ -111,7 +116,7 @@ export const Captions: React.FC<{
         flexWrap: 'wrap',
         justifyContent: 'center',
         alignItems: 'baseline',
-        columnGap: 22,
+        columnGap: tokens.caption.wordGap,
         rowGap: 6,
         textAlign: 'center',
       }}
@@ -154,6 +159,7 @@ const Headline: React.FC<{beat: Beat; tokens: Tokens}> = ({beat, tokens}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const enter = spring({frame, fps, config: tokens.spring.slam, durationInFrames: 16});
+  const bar = spring({frame: Math.max(frame - 5, 0), fps, config: tokens.spring.pop, durationInFrames: 14});
   const text = (beat.text_overlay.headline_text ?? '').toUpperCase();
   return (
     <div
@@ -161,20 +167,29 @@ const Headline: React.FC<{beat: Beat; tokens: Tokens}> = ({beat, tokens}) => {
         position: 'absolute',
         left: '50%',
         top: `${tokens.caption.yCenter * 100}%`,
-        transform: `translate(-50%, -50%) scale(${0.9 + enter * 0.1})`,
+        transform: `translate(-50%, -50%) scale(${0.88 + enter * 0.12})`,
         opacity: enter,
         width: tokens.caption.maxWidthPx,
         textAlign: 'center',
         fontFamily: tokens.font.family,
         fontWeight: tokens.font.weightBlack,
-        fontSize: tokens.caption.fontSize,
-        lineHeight: tokens.caption.lineHeight,
-        letterSpacing: tokens.caption.letterSpacing,
+        fontSize: tokens.headline.fontSize,
+        lineHeight: tokens.headline.lineHeight,
+        letterSpacing: '0.01em',
         color: tokens.color.text,
         textShadow: tokens.caption.textShadow,
       }}
     >
       {text}
+      <div
+        style={{
+          margin: '18px auto 0',
+          width: tokens.headline.underlineWidth * bar,
+          height: tokens.headline.underlineHeight,
+          borderRadius: tokens.headline.underlineHeight / 2,
+          background: tokens.color.accent,
+        }}
+      />
     </div>
   );
 };

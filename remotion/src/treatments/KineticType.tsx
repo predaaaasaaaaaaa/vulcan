@@ -21,11 +21,15 @@ export const KineticType: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens
   const ghost = (beat.text_overlay.emphasis_words ?? [])[0];
   if (!ghost) return null;
 
-  // ghost appears when its word is spoken
+  // ghost anticipates its word: enters at the word start OR 40% through the
+  // beat, whichever comes first — beat-final emphasis words otherwise leave
+  // the frame empty (Phase 4 eye check).
   const word = beat.words.find(
     (w) => w.w.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, '') === ghost.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, ''),
   );
-  const enterF = word ? msToFrame(word.s - beat.start_ms, fps) : 0;
+  const beatLen = beat.end_ms - beat.start_ms;
+  const enterMs = Math.min(word ? word.s - beat.start_ms : 0, beatLen * 0.4);
+  const enterF = msToFrame(enterMs, fps);
   const enter = spring({
     frame: Math.max(frame - enterF, 0),
     fps,

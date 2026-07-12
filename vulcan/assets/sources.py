@@ -81,25 +81,37 @@ def wikimedia(query: str, max_results: int = 6) -> list[Candidate]:
 
 # ---------------------------------------------------------------- duckduckgo
 
+# stock-photo preview hosts watermark their images — a watermarked cutout
+# fails the postable bar instantly (Phase 4 eye check: the VectorStock pearl)
+STOCK_BLOCKLIST = (
+    "vectorstock", "shutterstock", "alamy", "dreamstime", "istockphoto",
+    "123rf", "depositphotos", "gettyimages", "bigstockphoto", "canstockphoto",
+    "fotolia", "stockfresh", "colourbox", "agefotostock", "featurepics",
+)
+
+
 def ddg_images(query: str, transparent: bool = False, max_results: int = 8) -> list[Candidate]:
     try:
         from ddgs import DDGS
     except ImportError:  # older package name
         from duckduckgo_search import DDGS
     try:
-        kwargs = {"safesearch": "moderate", "size": "Large", "max_results": max_results}
+        kwargs = {"safesearch": "moderate", "size": "Large", "max_results": max_results + 6}
         if transparent:
             kwargs["type_image"] = "transparent"
         with DDGS() as ddgs:
             results = list(ddgs.images(query, **kwargs))
-        return [
-            Candidate(
-                url=r["image"], source="ddg",
+        out = []
+        for r in results:
+            url = str(r.get("image", ""))
+            if any(s in url.lower() for s in STOCK_BLOCKLIST):
+                continue
+            out.append(Candidate(
+                url=url, source="ddg",
                 width=int(r.get("width") or 0), height=int(r.get("height") or 0),
-                likely_alpha=transparent or str(r.get("image", "")).lower().endswith(".png"),
-            )
-            for r in results
-        ]
+                likely_alpha=transparent or url.lower().endswith(".png"),
+            ))
+        return out[:max_results]
     except Exception as e:
         log.warning("ddg source failed for %r (transparent=%s): %s", query, transparent, e)
         return []

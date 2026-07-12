@@ -69,3 +69,18 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Gate: 8/8 queries validated across all types → contact sheet VIEWED, all post-grade** (`runs/phase3_gate/contact_sheet.png`). Cache verified: re-run hits media.db by embedding similarity, zero network.
 
 **Evidence:** `runs/phase3_gate/contact_sheet.png` (+ per-asset PNGs), calibration table in session log, `cache/media.db`.
+
+---
+
+## PHASE 4 — REMOTION RENDER
+**Status: ✅ PASS** — 2026-07-12
+
+- Remotion 4 project under [remotion/](remotion/): `tokens.ts` (single style source, accent injectable from config.yaml via inputProps), offline font loading (committed Outfit variable TTF), Background (gradient drift + SVG grain + vignette), Captions (karaoke engine: 3–4-word groups split on punctuation/gaps, active-word pop, persistent accent on emphasis words, headline mode with accent underline), Camera (static/punch_in/drift), Transitions (hard_cut/whip/flash), all **9 treatments**, SFX layer, `<Master>` with `calculateMetadata` deriving duration from the manifest — the renderer cannot disagree with the audio.
+- **Network quirk:** remotion.dev/remotion.media (Cloudflare) unreachable on this LAN → Remotion crashed on an uncaught fetch at startup. Fixed by pinning `--browser-executable` to the puppeteer-cached chrome-headless-shell 148 (present from the old HyperFrames setup). No Remotion code touched.
+- **SFX library:** all external CC0 zip sources are JS-walled (Kenney) → **synthesized all 43 cues** with seeded numpy/scipy DSP ([sfx/build_sfx.py](sfx/build_sfx.py)): swept-bandpass whooshes (overlap-add crossfade after spectrogram showed block striping — verified by eye on spectrograms), FM bells, gated squares, layered booms. RMS-normalized to a −20dBFS bus, 24ms tails. CC0-by-construction, deterministic, 1.8MB total.
+- **Golden manifest:** [tests/build_golden.py](tests/build_golden.py) — 20 beats over the 62s fixture, all 9 treatments + both overlay modes + 6 real assets. My own validator rejected my first hand-cut (5 beats >5s) — the retry-injection message format proved itself before MiniMax ever saw it.
+- **Render gate (VIEW EVERY FRAME):** round 1 — 20/20 frames extracted & viewed; found: word-gap collapse under scale pops, beat-final heroes invisible (lemon/pearl/rooster/bread/VS), ghost lateness, weak headline mode, **watermarked stock pearl**, VS overlap. Fixes: wordGap token 30px; `clamp_asset_enter` ≤55% of beat (in [vulcan/beats.py](vulcan/beats.py), shared with Director conversion); ghost ≤40%; headline 96px + accent underline; **stock-domain blocklist** in ddg source; duel layout 24/76 @300px. Round 2 — 20/20 frames viewed, all pass the bar.
+- **QC caught real dead frames** (beats opening on ASR silence rendered nothing for up to 1.5s). Fix: captions always-on — first group displays dim from beat start, karaoke pop still lands on the word. Calibration data: dead frames var 1.8–2.9, live minimum 4.5 → `min_luma_variance: 4.0` confirmed.
+- **Final gate:** `runs/golden/out/golden.mp4` — **QC PASS**: Δduration 59ms, 8.57MB (≈25MB for 3min, well under the 45MB cap → CRF 23 confirmed), −14.62 LUFS, 12/12 sampled frames alive. Render 77s for 62s @ concurrency 4 (RAM watchdog silent) → `render.concurrency: 4` calibrated.
+
+**Evidence:** `runs/golden/out/golden.mp4`, `runs/golden/qc/` (r2_sheet_1..4.png = all 20 beat frames, contact_sheet.png, qc_report.json), `runs/golden/manifest.json`.

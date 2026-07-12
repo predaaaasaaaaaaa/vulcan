@@ -72,6 +72,16 @@ def beat_length_problems(beats: list[dict], min_ms: int = MIN_BEAT_MS, max_ms: i
     return problems
 
 
+ASSET_ENTER_MAX_FRAC = 0.55
+
+
+def clamp_asset_enter(enter_ms: int, beat_len_ms: int, frac: float = ASSET_ENTER_MAX_FRAC) -> int:
+    """Anticipate beat-final nouns: a hero that would enter after 55% of the
+    beat enters at 55% instead, so it actually reads on screen (Phase 4 eye
+    check: lemon/pearl/rooster/bread all invisible without this)."""
+    return max(min(enter_ms, int(beat_len_ms * frac)), 0)
+
+
 def silence_gaps(words: list[dict], min_gap_ms: int = 350) -> list[dict]:
     """Natural pause candidates, precomputed for the Pass A prompt."""
     gaps = []

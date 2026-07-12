@@ -36,17 +36,19 @@ export const TOKENS = {
     yCenter: 0.70,
     maxGroupWords: 4,
     minGroupWords: 3,
-    emphasisScale: 1.09,
+    emphasisScale: 1.08,
     inactiveOpacity: 0.92,
     strokePx: 0,
     textShadow: '0 4px 24px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.5)',
     maxWidthPx: 940,
+    wordGap: 30, // scale pops overflow their layout box — gap must absorb it
   },
 
   headline: {
-    fontSize: 92,
+    fontSize: 96,
     lineHeight: 1.05,
-    yCenter: 0.32,
+    underlineWidth: 180,
+    underlineHeight: 10,
   },
 
   cutout: {
@@ -75,7 +77,7 @@ export const TOKENS = {
     width: 920,
     radius: 28,
     padding: 48,
-    tweetFont: 44,
+    tweetFont: 48,
     quoteFont: 54,
     yCenter: 0.36,
   },
