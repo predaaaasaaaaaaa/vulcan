@@ -98,7 +98,8 @@ def _beat_table(skeleton: list[dict], words: list[dict]) -> str:
 
 
 def _norm(w: str) -> str:
-    return re.sub(r"[^\w'-]", "", w, flags=re.UNICODE).lower()
+    # no apostrophes in the normal form — ’ vs ' must not break matching
+    return re.sub(r"[^\w-]", "", w, flags=re.UNICODE).lower()
 
 
 def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
@@ -221,10 +222,49 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
             if "items" in payload:
                 items = []
                 for it in payload["items"][:4]:
+                    text = str(it.get("text", "")).strip()[:28]
+                    if not text:
+                        slip(f"{bid}: empty list item dropped")
+                        continue
                     at = word_anchor(it.get("at_word"), "list item") if "at_word" in it else int(it.get("at_ms", 0))
-                    items.append({"text": str(it.get("text", ""))[:28], "at_ms": max(min(at, blen), 0)})
+                    items.append({"text": text, "at_ms": max(min(at, blen), 0)})
                 items.sort(key=lambda x: x["at_ms"])
-                payload["items"] = items
+                if len(items) < 2:
+                    slip(f"{bid}: list_stack needs ≥2 items — payload dropped")
+                    payload.pop("items", None)
+                else:
+                    payload["items"] = items
+            if lenient:
+                # malformed sub-payloads sneak past assembly into schema
+                # rejection (empty attribution killed the 150s run) — sanitize
+                # here so the treatment-downgrade below can absorb the loss
+                if "stat_text" in payload:
+                    st = str(payload["stat_text"]).strip()[:12]
+                    if st:
+                        payload["stat_text"] = st
+                    else:
+                        notes.append(f"{bid}: empty stat_text dropped")
+                        payload.pop("stat_text")
+                if "tweet" in payload:
+                    t = payload["tweet"] or {}
+                    author = str(t.get("author", "")).strip()[:40]
+                    text = str(t.get("text", "")).strip()[:220]
+                    handle = re.sub(r"[^A-Za-z0-9_]", "", str(t.get("handle", "")))[:20]
+                    if author and text:
+                        payload["tweet"] = {"author": author, "handle": f"@{handle or 'anonymous'}", "text": text}
+                    else:
+                        notes.append(f"{bid}: malformed tweet payload dropped")
+                        payload.pop("tweet")
+                if "quote" in payload:
+                    q = payload["quote"] or {}
+                    text = str(q.get("text", "")).strip()[:160]
+                    attribution = str(q.get("attribution", "")).strip()[:40]
+                    if text and attribution:
+                        payload["quote"] = {"text": text, "attribution": attribution}
+                    else:
+                        notes.append(f"{bid}: quote payload incomplete (missing "
+                                     f"{'text' if not text else 'attribution'}) — dropped")
+                        payload.pop("quote")
             payload = payload or None
 
         if lenient:

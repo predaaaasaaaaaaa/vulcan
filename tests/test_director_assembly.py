@@ -141,6 +141,24 @@ def test_strict_still_rejects_same_mistakes():
     with pytest.raises(ValueError, match="unknown camera"):
         assemble(out)
 
+def test_lenient_drops_quote_with_empty_attribution_and_downgrades():
+    # the exact failure that killed the 150s run
+    from vulcan.validate import validate_manifest
+    out = b_out()
+    out["beats"][1]["treatment"] = "quote_card"
+    out["beats"][1]["overlay_mode"] = "karaoke"
+    out["beats"][1]["payload"] = {"quote": {"text": "some quote", "attribution": ""}}
+    notes = []
+    m = assemble_manifest("v_test_len2", "mastered.wav", DUR, SKEL, WORDS, out,
+                          lenient=True, notes=notes)
+    assert validate_manifest(m) == []
+    assert m["beats"][1]["treatment"] == "kinetic_type"
+
+def test_apostrophe_variants_match():
+    # ASR emits U+2019, models type ASCII — both must normalize identically
+    from vulcan.validate import _norm_word
+    assert _norm_word("Don’t") == _norm_word("Don't") == "dont"
+
 
 def test_patch_set_asset_queries_resets_status():
     m = assemble()

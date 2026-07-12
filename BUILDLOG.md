@@ -98,3 +98,18 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 - **Gate: 5/5 consecutive full chains valid** on the Phase-2 transcript (19–20 beats, 6–7 assets, 28–55s per chain). Observed self-healing in the wild: hallucinated cue `kick_01` → rejected+fixed on retry; missing stat payloads → fixed; a Pass-C patch that broke validation → auto-reverted. Run-5 sample quality: hook beat = cutout_pop/punch_in/whoosh + fox emphasis; query specificity like "red fox looking up at grapes illustration"; postable post kit.
 
 **Evidence:** gate output in session log, sample manifests in scratchpad `dirgate_1..5.json`.
+
+---
+
+## PHASE 6 — E2E + DELIVERY + SKILL
+**Status: ✅ PASS** — 2026-07-12
+
+- [vulcan/cli.py](vulcan/cli.py): the one guarded actuator — `run <file> | run --latest | status | doctor`. `--latest` resolves the newest cached Telegram ogg itself (agent never knows paths, RECON §1). Machine-readable protocol: `RUN_ID`/`STATUS n/7`/`DELIVER MEDIA:`/`POST_KIT_*`/`DONE|ERROR`. Failed assets degrade their beats to kinetic_type instead of killing the run (observed live: a04/a10 fallbacks). Per-run forensic log `runs/<id>/pipeline.log`. Wrapper: [bin/vulcan](bin/vulcan) (+`~/.local/bin/vulcan` symlink).
+- [vulcan/qc.py](vulcan/qc.py): all gates (duration ±150ms, 1080×1920@30 h264, ≤45MB, dead-frame luma scan, contact sheet, program LUFS ±1) + one auto-repair re-render in the CLI.
+- Delivery ([vulcan/deliver.py](vulcan/deliver.py)): primary = Hermes agent relays `MEDIA:` lines via send_message (per SKILL.md); fallback `direct_bot` mode via Bot API kept off by default. `hermes send` CLI confirmed as scripted no-agent path (`telegram:Preda` home DM).
+- **[skills/vulcan/SKILL.md](skills/vulcan/SKILL.md)** (Fat doctrine): triggers + one-tap confirm, background invocation (runs exceed Hermes's 180s terminal timeout), status relay etiquette, delivery order, and an exact per-stage failure playbook keyed to CLI `ERROR` strings. **Registered** via `skills.external_dirs` → verified: `hermes skills list` shows `vulcan · enabled` (config cache is mtime-keyed — hot-applied, no gateway restart).
+- **150s note initially failed pass B ×4** → forensic log revealed two systematic leaks, both now deterministic-fixed: (1) **apostrophe normalization** — ASR emits U+2019, models type ASCII `'` ("Don’t" ≠ "Don't") → all three normalizers (validator, assembler, renderer) now apostrophe-insensitive; (2) **lenient payload sanitation** — empty quote attributions sailed through assembly into schema rejection → malformed payloads are now sanitized/dropped so the treatment-downgrade absorbs them. +4 tests → **64 passed**.
+- Caption pop polish after eye-check: adaptive scale cap (grow ≤22px total) — long active words ("DISAPPOINTMENT") no longer fuse with neighbors; verified on the 150s render.
+- **Gate: two consecutive `vulcan run` greens** (v_20260712_065947 + prior), run 2 via **simulated Telegram trigger** (fixture copied into `~/.hermes/cache/audio/`, `--latest` picked it up). **Both DONE-criteria notes green**: 62s → 8.2MB and 150s → 48 beats/10 assets/17.3MB (projects ≈35MB for 3min, inside the 45MB cap). Frames eye-checked on both.
+
+**Evidence:** `runs/v_20260712_065947/`, `runs/v_20260712_105540/` (manifest, pipeline.log, qc/, out/final.mp4), scratchpad `e2e_r1.log`, `e2e_r2.log`, `e2e_150b.log`, `l150_sheet.png`.

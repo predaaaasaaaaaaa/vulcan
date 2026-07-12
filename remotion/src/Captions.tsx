@@ -55,7 +55,7 @@ const displayWord = (w: string): string =>
   w.replace(/[.,!?;:"“”]+$/g, '').replace(/^["“”]+/g, '').toUpperCase();
 
 const normWord = (w: string): string =>
-  w.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, '');
+  w.toLowerCase().replace(/[^\p{L}\p{N}-]/gu, ''); // apostrophe-insensitive, both ' and ’
 
 export const Captions: React.FC<{
   beat: Beat;
@@ -129,10 +129,13 @@ export const Captions: React.FC<{
         const pop = active
           ? spring({frame: Math.max(popFrame, 0), fps, config: tokens.spring.pop, durationInFrames: 10})
           : 0;
-        // one shared pop scale: long emphasized words at 1.13 overflowed the
-        // word gap and visually fused with neighbours (Phase 6 eye check) —
-        // emphasis is already carried by color + weight 900
-        const scale = 1 + pop * (tokens.caption.emphasisScale - 1);
+        // adaptive pop: scale grows a word by (scale-1)*width/2 px per side,
+        // so long words must pop less or they fuse with neighbours (the gap
+        // is fixed). Cap total growth at 22px — short words pop hard, a
+        // 14-char word pops ~4%, nothing ever touches.
+        const estWidth = displayWord(w.w).length * tokens.caption.fontSize * 0.52;
+        const scaleCap = 1 + 22 / Math.max(estWidth, 60);
+        const scale = 1 + pop * (Math.min(tokens.caption.emphasisScale, scaleCap) - 1);
         return (
           <span
             key={`${gi}-${i}`}

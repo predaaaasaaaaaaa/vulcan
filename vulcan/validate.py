@@ -39,7 +39,9 @@ _HERO_TYPE_CONSTRAINTS = {
     "logo_versus": {"logo", "photo_cutout", "flat_icon", "3d_icon"},
 }
 
-_WORD_STRIP_RE = re.compile(r"[^\w'-]", re.UNICODE)
+# strips ALL apostrophe variants: ASR emits U+2019 (’), models type ASCII (')
+# — "Don’t" and "Don't" must normalize identically (Phase 6 150s-run bug)
+_WORD_STRIP_RE = re.compile(r"[^\w-]", re.UNICODE)
 
 
 def _norm_word(w: str) -> str:
