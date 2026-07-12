@@ -129,7 +129,10 @@ export const Captions: React.FC<{
         const pop = active
           ? spring({frame: Math.max(popFrame, 0), fps, config: tokens.spring.pop, durationInFrames: 10})
           : 0;
-        const scale = 1 + pop * ((isEmph ? 1.13 : tokens.caption.emphasisScale) - 1);
+        // one shared pop scale: long emphasized words at 1.13 overflowed the
+        // word gap and visually fused with neighbours (Phase 6 eye check) —
+        // emphasis is already carried by color + weight 900
+        const scale = 1 + pop * (tokens.caption.emphasisScale - 1);
         return (
           <span
             key={`${gi}-${i}`}

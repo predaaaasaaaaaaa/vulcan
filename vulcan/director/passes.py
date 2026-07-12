@@ -102,9 +102,29 @@ def _norm(w: str) -> str:
 
 
 def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
-                      skeleton: list[dict], words: list[dict], b_out: dict) -> dict:
+                      skeleton: list[dict], words: list[dict], b_out: dict,
+                      lenient: bool = False, notes: list[str] | None = None) -> dict:
     """Deterministic Pass-B-output → manifest conversion. Raises ValueError with
-    injectable messages on any reference the model got wrong."""
+    injectable messages on any reference the model got wrong.
+
+    ``lenient=True`` (the FINAL retry) coerces taste-level mistakes to the
+    nearest legal manifest instead of raising — unknown cue → cue dropped,
+    unspoken emphasis word → word dropped, missing payload/role → treatment
+    downgraded to kinetic_type, bad camera/transition → defaults. Structural
+    problems (missing beats, unusable JSON) still raise. Doctrine: two strict
+    attempts keep quality pressure on MiniMax; the lenient pass makes a legal
+    render inevitable.
+    """
+    if notes is None:
+        notes = []
+
+    def slip(msg: str, fallback=None):
+        """Raise when strict; log-and-coerce when lenient."""
+        if not lenient:
+            raise ValueError(msg)
+        notes.append(msg)
+        return fallback
+
     beats_out = {b.get("id"): b for b in b_out.get("beats", [])}
     expected_ids = [f"b{i+1:02d}" for i in range(len(skeleton))]
     missing = [i for i in expected_ids if i not in beats_out]
@@ -123,6 +143,9 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
 
         def word_anchor(wi, what):
             if not isinstance(wi, int) or wi not in wrange:
+                if lenient:
+                    notes.append(f"{bid}: {what} anchor {wi!r} out of beat — snapped to beat start")
+                    return 0
                 raise ValueError(
                     f"{bid}: {what} at_word/enter_word {wi} is not a word index of this beat "
                     f"(valid: {sk['first_word']}-{sk['last_word']})")
@@ -130,31 +153,46 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
 
         treatment = bo.get("treatment")
         if treatment not in TREATMENTS:
-            raise ValueError(f"{bid}: unknown treatment {treatment!r}")
+            treatment = slip(f"{bid}: unknown treatment {bo.get('treatment')!r}", "kinetic_type")
         camera = bo.get("camera")
         if camera not in CAMERAS:
-            raise ValueError(f"{bid}: unknown camera {camera!r}")
+            camera = slip(f"{bid}: unknown camera {bo.get('camera')!r}", "static")
         transition = bo.get("transition_out")
         if transition not in TRANSITIONS:
-            raise ValueError(f"{bid}: unknown transition_out {transition!r}")
+            transition = slip(f"{bid}: unknown transition_out {bo.get('transition_out')!r}", "hard_cut")
 
+        beat_word_set = {_norm(w["w"]) for w in beat_words}
         mode = bo.get("overlay_mode", "karaoke")
-        overlay = {"mode": mode}
+        overlay = {"mode": mode if mode in ("karaoke", "headline") else "karaoke"}
         if bo.get("emphasis_words"):
-            overlay["emphasis_words"] = [str(w) for w in bo["emphasis_words"]][:4]
-        if mode == "headline":
-            overlay["headline_text"] = str(bo.get("headline_text") or "")[:60]
+            emph = [str(w) for w in bo["emphasis_words"]][:4]
+            if lenient:
+                kept = [w for w in emph if _norm(w) in beat_word_set]
+                if len(kept) != len(emph):
+                    notes.append(f"{bid}: dropped unspoken emphasis words "
+                                 f"{[w for w in emph if _norm(w) not in beat_word_set]}")
+                emph = kept
+            if emph:
+                overlay["emphasis_words"] = emph
+        if overlay["mode"] == "headline":
+            text = str(bo.get("headline_text") or "")
+            if lenient and len(text.split()) > 6:
+                notes.append(f"{bid}: headline truncated to 6 words")
+                text = " ".join(text.split()[:6])
+            overlay["headline_text"] = text[:60]
 
         refs = []
         for a in bo.get("assets") or []:
             atype, role = a.get("type"), a.get("role")
             if atype not in ASSET_TYPES:
-                raise ValueError(f"{bid}: unknown asset type {atype!r}")
+                slip(f"{bid}: unknown asset type {atype!r}")
+                continue
             if role not in ROLES:
-                raise ValueError(f"{bid}: unknown asset role {role!r}")
+                role = slip(f"{bid}: unknown asset role {a.get('role')!r}", "hero")
             queries = [str(q)[:80] for q in (a.get("queries") or []) if str(q).strip()][:3]
             if not queries:
-                raise ValueError(f"{bid}: asset '{a.get('label')}' has no queries")
+                slip(f"{bid}: asset '{a.get('label')}' has no queries")
+                continue
             key = (atype, _norm(str(a.get("label") or queries[0])))
             if key not in assets_registry:
                 assets_registry[key] = {
@@ -167,9 +205,14 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
                          "enter_ms": enter, "exit_ms": blen})
 
         sfx = []
+        known_cues = load_sfx_cues()
         for s in (bo.get("sfx") or [])[:2]:
+            cue = str(s.get("cue"))
+            if lenient and cue not in known_cues:
+                notes.append(f"{bid}: dropped unknown sfx cue {cue!r}")
+                continue
             at = word_anchor(s.get("at_word"), "sfx")
-            sfx.append({"cue": str(s.get("cue")), "at_ms": clamp_asset_enter(at, blen, 0.92)})
+            sfx.append({"cue": cue, "at_ms": clamp_asset_enter(at, blen, 0.92)})
 
         payload = bo.get("payload") or None
         if payload:
@@ -183,6 +226,23 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
                 items.sort(key=lambda x: x["at_ms"])
                 payload["items"] = items
             payload = payload or None
+
+        if lenient:
+            # downgrade treatments whose hard requirements aren't met — a plain
+            # kinetic beat is always legal and still carries the captions
+            from ..validate import _PAYLOAD_REQUIREMENTS, _ROLE_REQUIREMENTS
+            need_payload = _PAYLOAD_REQUIREMENTS.get(treatment)
+            roles_here = {r["role"] for r in refs}
+            missing_role = any(r not in roles_here for r in _ROLE_REQUIREMENTS.get(treatment, ()))
+            if (need_payload and need_payload not in (payload or {})) or missing_role:
+                notes.append(f"{bid}: treatment {treatment} downgraded to kinetic_type "
+                             f"(missing {'payload.' + need_payload if need_payload else 'role'})")
+                treatment = "kinetic_type"
+                payload = None
+                refs = [r for r in refs if r["role"] in ("hero", "secondary")]
+            if overlay["mode"] == "headline" and not overlay.get("headline_text"):
+                notes.append(f"{bid}: empty headline — switched to karaoke")
+                overlay = {"mode": "karaoke", **({"emphasis_words": overlay["emphasis_words"]} if overlay.get("emphasis_words") else {})}
 
         beat = {
             "id": bid, "start_ms": sk["start_ms"], "end_ms": sk["end_ms"],
@@ -205,20 +265,27 @@ def pass_b(video_id: str, audio_path: str, duration_ms: int,
            skeleton: list[dict], words: list[dict], language: str) -> dict:
     sfx_cues = load_sfx_cues()
     feedback = ""
-    for attempt in range(1 + _retries()):
+    attempts = 1 + _retries()
+    for attempt in range(attempts):
+        lenient = attempt == attempts - 1  # final attempt: coerce, don't reject
         text = chat(
             system="You are an art director. Output strict JSON only.",
             user=_prompt("pass_b", language=language,
                          beat_table=_beat_table(skeleton, words), feedback=feedback),
         )
         try:
+            notes: list[str] = []
             manifest = assemble_manifest(video_id, audio_path, duration_ms,
-                                         skeleton, words, extract_json(text))
+                                         skeleton, words, extract_json(text),
+                                         lenient=lenient, notes=notes)
+            for n in notes:
+                log.info("pass B lenient coercion: %s", n)
             errs = validate_manifest(manifest, sfx_cues=sfx_cues)
             if errs:
                 raise ValueError("; ".join(errs[:8]))
-            log.info("pass B ok: %d beats, %d assets (attempt %d)",
-                     len(manifest["beats"]), len(manifest["assets"]), attempt + 1)
+            log.info("pass B ok: %d beats, %d assets (attempt %d%s)",
+                     len(manifest["beats"]), len(manifest["assets"]), attempt + 1,
+                     ", lenient" if lenient and notes else "")
             return manifest
         except (ValueError, DirectorError) as e:
             log.warning("pass B attempt %d rejected: %s", attempt + 1, str(e)[:300])
@@ -226,7 +293,7 @@ def pass_b(video_id: str, audio_path: str, duration_ms: int,
                 f"\nYOUR PREVIOUS ANSWER WAS REJECTED by the validator:\n{e}\n"
                 "Fix exactly these problems (keep everything else identical) and output the corrected JSON.\n"
             )
-    raise DirectorError(f"pass B failed after {1 + _retries()} attempts")
+    raise DirectorError(f"pass B failed after {attempts} attempts")
 
 
 # ------------------------------------------------------------------ PASS C

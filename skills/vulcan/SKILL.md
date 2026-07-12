@@ -26,13 +26,13 @@ The voice note is already cached on disk by the gateway. You do NOT know its
 path — the CLI resolves the newest one itself:
 
 ```bash
-cd /home/preda/vulcan && .venv/bin/python -m vulcan.cli run --latest
+/home/preda/vulcan/bin/vulcan run --latest
 ```
 
 - Use your terminal/process tool in BACKGROUND mode (a run takes 2–8 minutes —
   longer than the terminal timeout; poll the process output).
-- Testing with an explicit file: `.venv/bin/python -m vulcan.cli run /path/to/voice.ogg`
-- Environment check: `.venv/bin/python -m vulcan.cli doctor`
+- Testing with an explicit file: `/home/preda/vulcan/bin/vulcan run /path/to/voice.ogg`
+- Environment check: `/home/preda/vulcan/bin/vulcan doctor`
 
 ## While it runs — status relay
 The CLI prints lines like `STATUS 3/7 director — 86 words → beats + treatments`.

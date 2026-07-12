@@ -73,6 +73,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     run_dir = RUNS_DIR / video_id
     (run_dir / "audio").mkdir(parents=True, exist_ok=True)
     shutil.copy(voice, run_dir / "audio" / f"input{voice.suffix}")
+    # forensic log: every stage's INFO/WARNING lands in the run dir, so a
+    # failed run explains itself without rerunning
+    fh = logging.FileHandler(run_dir / "pipeline.log")
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(fh)
     print(f"RUN_ID {video_id}")
     status(f"1/7 ingest — mastering {voice.name}")
 

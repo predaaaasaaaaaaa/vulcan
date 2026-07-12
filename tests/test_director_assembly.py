@@ -116,6 +116,32 @@ def test_patch_drop_asset_removes_orphan():
     assert m["beats"][0]["assets"] == []
     assert m["assets"] == []
 
+# ---------- lenient (final-attempt) assembly ----------
+
+def test_lenient_coerces_all_taste_mistakes():
+    from vulcan.validate import validate_manifest
+    out = b_out()
+    out["beats"][0]["sfx"][0]["cue"] = "epic_boom_99"          # unknown cue → dropped
+    out["beats"][0]["emphasis_words"] = ["Apple", "Bitcoin"]   # unspoken word → dropped
+    out["beats"][1]["payload"] = None                          # stat_slam w/o payload → downgrade
+    out["beats"][1]["camera"] = "dolly_zoom"                   # bad camera → static
+    notes = []
+    m = assemble_manifest("v_test_len1", "mastered.wav", DUR, SKEL, WORDS, out,
+                          lenient=True, notes=notes)
+    assert validate_manifest(m) == []
+    assert m["beats"][0]["sfx"] == []
+    assert m["beats"][0]["text_overlay"]["emphasis_words"] == ["Apple"]
+    assert m["beats"][1]["treatment"] == "kinetic_type"
+    assert m["beats"][1]["camera"] == "static"
+    assert len(notes) >= 4
+
+def test_strict_still_rejects_same_mistakes():
+    out = b_out()
+    out["beats"][1]["camera"] = "dolly_zoom"
+    with pytest.raises(ValueError, match="unknown camera"):
+        assemble(out)
+
+
 def test_patch_set_asset_queries_resets_status():
     m = assemble()
     m["assets"][0]["status"] = "validated"
