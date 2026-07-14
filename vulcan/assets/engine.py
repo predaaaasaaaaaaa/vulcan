@@ -114,9 +114,14 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
             break
         phrase = _score_phrase(asset, query)
 
-        # 1) cache first — recurring topics compound
+        # 1) cache first — recurring topics compound. Screenshots/logos are
+        # entity-specific: a loose match reused a Stripe homepage for a "GPT"
+        # beat (2026-07-14) — they need a much stronger similarity to reuse.
+        cache_floor = threshold + 0.02
+        if asset["type"] in ("screenshot", "logo"):
+            cache_floor = max(cache_floor, 0.12)
         try:
-            cached = media_cache.find_similar(text_embedding(phrase), asset["type"], threshold + 0.02)
+            cached = media_cache.find_similar(text_embedding(phrase), asset["type"], cache_floor)
             if cached:
                 asset.update(path=cached["path"], status="validated",
                              score=round(cached["sim"], 4))

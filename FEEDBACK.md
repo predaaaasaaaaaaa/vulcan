@@ -14,6 +14,12 @@ fix/iteration log underneath each item.
 2. Too many operator-side failures: stale audio re-forged 3×, wrong python, 16-min asset hang, Pass-A death on his real 106s note.
 3. "Didn't expect that many errors — stop and report."
 
+## Samy's notes — session 2 (2026-07-14, run v_20260714_033227)
+1. "Captions and SFX are there but NO visual animations at all — no PNGs, no motion graphics, pure black screen."
+2. "No background music that corresponds to the type of video."
+
+**Iteration (same day):** richness law (pass-B quota + 35%/20% floors + stage-4 abort + QC gate), emoji query resolution fixed (the 404 class), music system built (5 mood beds, Director-picked, word-ducked), never-bare kinetic beats, screenshot cache-pollution fix. Re-run of the same note: 10 visual beats (8 emoji + cutout + ChatGPT screenshot), tech bed, QC green — frames eye-checked. Video: `runs/v_20260714_041639/out/final.mp4`.
+
 ## Iterations
 **2026-07-12 (post-mortem package, commit-tracked):**
 - Abstract-topic rule (Samy's prompt rule 12) now backed by a deterministic law: photo/screenshot/logo asset requests must reference a spoken word or they're rejected/dropped. Reverted the 0.30 SigLIP floor (would have disabled the asset engine); kept 0.05.
