@@ -21,7 +21,7 @@ log = logging.getLogger("vulcan.director")
 PROMPTS = Path(__file__).parent / "prompts"
 
 TREATMENTS = {"kinetic_type", "cutout_pop", "stat_slam", "list_stack", "tweet_card",
-              "screenshot_zoom", "logo_versus", "emoji_burst", "quote_card", "chart_pop"}
+              "screenshot_zoom", "logo_versus", "emoji_burst", "quote_card", "chart_pop", "network_grow"}
 ASSET_TYPES = {"photo_cutout", "3d_icon", "flat_icon", "logo", "emoji", "screenshot"}
 ROLES = {"hero", "secondary", "left", "right"}
 CAMERAS = {"static", "punch_in", "drift"}
@@ -272,7 +272,7 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
         payload = bo.get("payload") or None
         if payload:
             payload = {k: v for k, v in payload.items()
-                       if k in ("stat_text", "items", "tweet", "quote", "chart") and v}
+                       if k in ("stat_text", "items", "tweet", "quote", "chart", "network") and v}
             if "items" in payload:
                 items = []
                 for it in payload["items"][:4]:
@@ -318,6 +318,14 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
                     else:
                         notes.append(f"{bid}: malformed chart payload dropped")
                         payload.pop("chart")
+                if "network" in payload:
+                    nw = payload["network"] or {}
+                    nlabel = str(nw.get("label", "")).strip()[:18]
+                    if nlabel:
+                        payload["network"] = {"label": nlabel}
+                    else:
+                        notes.append(f"{bid}: empty network label dropped")
+                        payload.pop("network")
                 if "quote" in payload:
                     q = payload["quote"] or {}
                     text = str(q.get("text", "")).strip()[:160]
@@ -412,22 +420,22 @@ def richness_problems(manifest: dict, floor: float) -> list[str]:
 
 
 def variety_problems(manifest: dict) -> list[str]:
-    """Emoji monotony guard (2026-07-14: 8/10 visual beats were emoji — 'only
-    fckn emojis are rendering'). Among visual beats, emoji_burst may carry at
-    most half; the rest must come from the other treatments."""
+    """Emoji monotony guard. Samy's taste law: emojis read as cheap in
+    short-form — among visual beats emoji_burst may carry at most a QUARTER;
+    real cutouts and Remotion-native graphics carry the rest."""
     beats = manifest["beats"]
     visual = [b for b in beats if b["assets"] or b["treatment"] in VISUAL_TREATMENTS]
     if len(visual) < 4:
         return []
     emoji = [b["id"] for b in visual if b["treatment"] == "emoji_burst"]
-    if len(emoji) / len(visual) <= 0.5:
+    if len(emoji) / len(visual) <= 0.25:
         return []
     return [
         f"TREATMENT MONOTONY: {len(emoji)}/{len(visual)} visual beats are emoji_burst "
-        f"(max 50%). Re-assign some of {', '.join(emoji[:6])} to: chart_pop (trend/cost/"
-        f"scale/growth claims), quote_card (the thesis line), stat_slam (spoken numbers), "
-        f"list_stack (enumerations), screenshot_zoom (named products/sites), "
-        f"cutout_pop (spoken concrete nouns)."
+        f"(max 25% — emojis read as cheap). Re-assign most of {', '.join(emoji[:6])} to: "
+        f"cutout_pop (REAL photo png of any spoken noun — preferred), network_grow "
+        f"(scale/systems), chart_pop (trends/costs), quote_card, stat_slam, list_stack, "
+        f"screenshot_zoom."
     ]
 
 

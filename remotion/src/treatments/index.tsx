@@ -10,6 +10,7 @@ import {EmojiBurst} from './EmojiBurst';
 import {KineticType} from './KineticType';
 import {ListStack} from './ListStack';
 import {LogoVersus} from './LogoVersus';
+import {NetworkGrow} from './NetworkGrow';
 import {QuoteCard} from './QuoteCard';
 import {ScreenshotZoom} from './ScreenshotZoom';
 import {StatSlam} from './StatSlam';
@@ -28,4 +29,5 @@ export const TREATMENTS: Record<Treatment, TreatmentComponent> = {
   emoji_burst: EmojiBurst,
   quote_card: QuoteCard,
   chart_pop: ChartPop,
+  network_grow: NetworkGrow,
 };

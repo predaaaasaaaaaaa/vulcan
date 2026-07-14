@@ -78,13 +78,21 @@ def test_variety_guard_rejects_all_emoji():
     # simpler: construct manifest directly
     m = {"beats": [{"id": b["id"], "treatment": "emoji_burst", "assets": [1]} for b in out["beats"]]}
     assert variety_problems(m)
+    # 25% law: 1 emoji among 4 visual beats passes; 2/4 fails
     m2 = {"beats": [
         {"id": "b01", "treatment": "emoji_burst", "assets": [1]},
         {"id": "b02", "treatment": "chart_pop", "assets": []},
         {"id": "b03", "treatment": "quote_card", "assets": []},
-        {"id": "b04", "treatment": "emoji_burst", "assets": [1]},
+        {"id": "b04", "treatment": "network_grow", "assets": []},
     ]}
     assert variety_problems(m2) == []
+    m3 = {"beats": [
+        {"id": "b01", "treatment": "emoji_burst", "assets": [1]},
+        {"id": "b02", "treatment": "emoji_burst", "assets": [1]},
+        {"id": "b03", "treatment": "quote_card", "assets": []},
+        {"id": "b04", "treatment": "network_grow", "assets": []},
+    ]}
+    assert variety_problems(m3)
 
 def test_chart_pop_requires_payload():
     from vulcan.validate import validate_manifest

@@ -44,10 +44,12 @@ def beat_plan(W, sk):
              text_overlay={"mode": "karaoke", "emphasis_words": ["jumps"]},
              assets=[], sfx=[{"cue": "swish_01", "at_ms": rel(1, 8)}],
              camera="static", transition_out="hard_cut"),
-        # b03 "but the bunch still escapes."
-        dict(treatment=K,
+        # b03 "but the bunch still escapes." — exercises network_grow
+        dict(treatment="network_grow",
              text_overlay={"mode": "karaoke", "emphasis_words": ["escapes"]},
-             assets=[], sfx=[], camera="drift", transition_out="whip"),
+             assets=[], sfx=[{"cue": "riser_02", "at_ms": 100}],
+             camera="static", transition_out="whip",
+             payload={"network": {"label": "THE BUNCH"}}),
         # b04 "So he goes away sour,"
         dict(treatment="emoji_burst",
              text_overlay={"mode": "karaoke", "emphasis_words": ["sour"]},

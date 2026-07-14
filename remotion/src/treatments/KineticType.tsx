@@ -59,8 +59,41 @@ export const KineticType: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens
   const zoneTop = 10, zoneBottom = 54;
   const rowH = (zoneBottom - zoneTop) / Math.max(rows, 2);
 
+  // garnish: floating accent shapes (ring + dot + tick) drifting around the
+  // stack — the "taste" layer that separates typography from motion design
+  const sec = frame / fps;
+  const shapes = [
+    {x: 14 + seeded(beat.id, 51) * 10, y: 16 + seeded(beat.id, 52) * 8, kind: 'ring', size: 26, spd: 0.9},
+    {x: 80 + seeded(beat.id, 53) * 8, y: 24 + seeded(beat.id, 54) * 20, kind: 'dot', size: 12, spd: 1.3},
+    {x: 20 + seeded(beat.id, 55) * 12, y: 46 + seeded(beat.id, 56) * 6, kind: 'tick', size: 30, spd: 0.7},
+  ];
+  const garnishIn = spring({frame: Math.max(frame - 6, 0), fps, config: tokens.spring.gentle, durationInFrames: 20});
+
   return (
     <AbsoluteFill style={{overflow: 'hidden'}}>
+      {shapes.map((sh, i) => (
+        <div
+          key={`g${i}`}
+          style={{
+            position: 'absolute',
+            left: `${sh.x + Math.sin(sec * sh.spd + i * 2.1) * 2.2}%`,
+            top: `${sh.y + Math.cos(sec * sh.spd * 0.8 + i) * 2.6}%`,
+            opacity: 0.5 * garnishIn,
+            transform: `rotate(${sec * 14 * sh.spd}deg)`,
+          }}
+        >
+          {sh.kind === 'ring' ? (
+            <div style={{width: sh.size, height: sh.size, borderRadius: '50%',
+                         border: `4px solid ${tokens.color.accent}`}} />
+          ) : sh.kind === 'dot' ? (
+            <div style={{width: sh.size, height: sh.size, borderRadius: '50%',
+                         background: tokens.color.text, opacity: 0.7}} />
+          ) : (
+            <div style={{width: sh.size, height: 5, borderRadius: 3,
+                         background: tokens.color.accent}} />
+          )}
+        </div>
+      ))}
       {stack.map((line, i) => {
         // anticipate late words the same way heroes do (≤55% of the beat)
         const relMs = Math.min(line.word.s - beat.start_ms, beatLen * 0.55);
@@ -99,6 +132,18 @@ export const KineticType: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens
             }}
           >
             {display(line.word.w)}
+            {line.isEmph ? (
+              <div
+                style={{
+                  margin: '6px auto 0',
+                  height: 8,
+                  borderRadius: 4,
+                  width: `${Math.min(s * 90, 90)}%`,
+                  background: `linear-gradient(90deg, transparent, ${tokens.color.accent}, transparent)`,
+                  opacity: 0.85,
+                }}
+              />
+            ) : null}
           </div>
         );
       })}
