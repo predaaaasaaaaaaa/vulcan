@@ -115,6 +115,41 @@ def test_lenient_drops_malformed_chart_and_downgrades():
     assert m["beats"][0]["treatment"] == "kinetic_type"
 
 
+# --- orphan pruning + off-by-one anchors (run v_20260714_052811 failure chain) ---
+
+def test_lenient_ref_drop_prunes_orphaned_asset():
+    from vulcan.validate import validate_manifest
+    out = bare_bout()
+    # logo_versus with one legal logo ('agents' spoken) and one that references
+    # nothing spoken → lenient drops it → downgrade strips the other ref →
+    # BOTH assets must be pruned, no orphans left behind
+    out["beats"][0]["treatment"] = "logo_versus"
+    out["beats"][0]["assets"] = [
+        {"label": "agents logo", "type": "logo", "role": "left",
+         "queries": ["agents logo"], "enter_word": 1},
+        {"label": "Claude AI logo", "type": "logo", "role": "right",
+         "queries": ["claude ai logo", "anthropic logo"], "enter_word": 1},
+    ]
+    notes = []
+    m = assemble_manifest("v_test_orph1", "mastered.wav", DUR, SKEL, WORDS, out,
+                          lenient=True, notes=notes)
+    assert validate_manifest(m) == []          # would previously fail E_ASSET_ORPHAN
+    assert m["beats"][0]["treatment"] == "kinetic_type"
+    assert m["assets"] == []
+
+def test_off_by_one_anchor_clamps_in_strict_mode():
+    out = bare_bout()
+    last = SKEL[0]["last_word"]
+    out["beats"][0]["treatment"] = "list_stack"
+    out["beats"][0]["payload"] = {"items": [
+        {"text": "first", "at_word": SKEL[0]["first_word"]},
+        {"text": "second", "at_word": last + 1},   # the classic off-by-one
+    ]}
+    m = assemble_manifest("v_test_ob1", "mastered.wav", DUR, SKEL, WORDS, out)
+    blen = m["beats"][0]["end_ms"] - m["beats"][0]["start_ms"]
+    assert 0 <= m["beats"][0]["payload"]["items"][-1]["at_ms"] <= blen
+
+
 # --- emoji name resolution (the 404 class) ---
 
 def test_name_variants_strip_filler():

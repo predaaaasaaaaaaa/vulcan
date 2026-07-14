@@ -148,6 +148,16 @@ Run v_20260714_033227 shipped green: captions + SFX, **zero visuals, no music** 
 
 Tests: 81 → **89** (richness floor, coverage, music mapping/coercion, emoji variants incl. live-404-recovery pattern).
 
+### PRO-BAR SPRINT (2026-07-14, Samy's verdict on v_20260714_041639: "only emojis… black void spaces… not something people will watch")
+The richness floor produced a *legal* video, not a *pro* one — 19/29 beats were still caption-plus-ghost and the Director leaned 8/10 visual beats on emoji. Renderer-level rebuild + variety law:
+
+1. **KineticType v2 — true kinetic typography**: every kinetic beat now builds a 1–4 power-word STACK in the upper zone (emphasis words + longest words), each line slamming in at its word's timestamp (anticipation-clamped), alternating rotations/sizes, accent on emphasis, idle float after landing. The v1 "faint ghost" (7% opacity) is gone — the words ARE the motion graphic, and the void class of frame no longer exists.
+2. **Background v2**: parallax dot grid + two orbiting accent blobs (5%) over the gradient drift + grain + vignette — dark but alive on every frame.
+3. **Idle motion everywhere** (`useIdle`): landed heroes bob/sway/pulse (emoji, cutouts, screenshots, charts, kinetic lines). Static elements read as screenshots, not motion graphics.
+4. **NEW treatment `chart_pop`** (Samy asked for charts): synthetic animated bar/line charts — no data needed, Director gives direction+label (payload.chart {kind: bar_up|bar_down|line_up|line_down, label ≤18}); staggered bar springs / path-draw line with glow head; accent for rising, danger-red for falling. Wired through all 5 layers (schema enum+payload, validator payload law, assembly sanitation, prompt menu row + triggers, component) — the pattern is now documented by example for future treatments.
+5. **Variety law**: `variety_problems` — emoji_burst may carry ≤50% of visual beats (strict passes inject the fix list; lenient logs). Prompt rule 13b + Pass C monotony/emoji-semantics checklist items.
+- Golden v3 re-gated by eye (kinetic stacks, chart, emoji idle, VS, background) — QC green. Tests 89 → **93**.
+
 ### Post-announce upgrades (Samy's request, 2026-07-12)
 - **`vulcan cleanup <id> [--purge] | --all`** — approval-triggered reclaim: keeps `final.mp4` + receipts (manifest/words/QC report/log), frees intermediates (~70%: mastered wav, raw renders, QC frames, rejected asset candidates). Validated assets **migrate to `cache/assets/` with media.db paths updated first** — cleanup never costs the cross-run cache. Live-verified on run 064411: 26MB → 7.8MB, 3 assets migrated, 0 broken cache paths.
 - **Consumed-notes ledger** (`runs/.consumed.json`, keyed path+mtime, 48h TTL): `run --latest` skips notes that were already forged — an old cached voice message can never be re-forged when the user means a new one (the old/new mismatch Samy flagged). Distinct error text tells the agent to ask for a fresh note.

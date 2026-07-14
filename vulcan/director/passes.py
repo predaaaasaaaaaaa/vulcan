@@ -182,6 +182,14 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
         beat_words = [{"w": words[j]["w"], "s": words[j]["s"], "e": words[j]["e"]} for j in wrange]
 
         def word_anchor(wi, what):
+            if isinstance(wi, int) and wi not in wrange:
+                # off-by-one forgiveness: models habitually anchor "the end"
+                # at last_word+1 (burned 3 strict retries on one run) — an
+                # off-by-one is mechanical, not creative; clamp silently
+                if wi == sk["last_word"] + 1:
+                    wi = sk["last_word"]
+                elif wi == sk["first_word"] - 1:
+                    wi = sk["first_word"]
             if not isinstance(wi, int) or wi not in wrange:
                 if lenient:
                     notes.append(f"{bid}: {what} anchor {wi!r} out of beat — snapped to beat start")
@@ -348,6 +356,15 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
             beat["payload"] = payload
         manifest_beats.append(beat)
 
+    # prune assets whose every reference was dropped (lenient guard drops /
+    # treatment downgrades strip refs) — an orphan here failed a whole run
+    still_referenced = {r["asset_id"] for b in manifest_beats for r in b["assets"]}
+    assets_final = [a for a in assets_registry.values() if a["asset_id"] in still_referenced]
+    if len(assets_final) != len(assets_registry):
+        dropped_ids = [a["asset_id"] for a in assets_registry.values()
+                       if a["asset_id"] not in still_referenced]
+        notes.append(f"pruned orphaned assets after ref drops: {dropped_ids}")
+
     # music mood: MiniMax picks from the menu; invalid/missing coerces to a
     # safe default (music must never block a video)
     mood = str(b_out.get("music_mood") or "").strip().lower()
@@ -365,7 +382,7 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
         "video_id": video_id, "fps": 30, "aspect": "9:16",
         "audio": {"path": audio_path, "duration_ms": duration_ms},
         "beats": manifest_beats,
-        "assets": list(assets_registry.values()),
+        "assets": assets_final,
         "music": music,
     }
 

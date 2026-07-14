@@ -20,6 +20,13 @@ fix/iteration log underneath each item.
 
 **Iteration (same day):** richness law (pass-B quota + 35%/20% floors + stage-4 abort + QC gate), emoji query resolution fixed (the 404 class), music system built (5 mood beds, Director-picked, word-ducked), never-bare kinetic beats, screenshot cache-pollution fix. Re-run of the same note: 10 visual beats (8 emoji + cutout + ChatGPT screenshot), tech bed, QC green — frames eye-checked. Video: `runs/v_20260714_041639/out/final.mp4`.
 
+## Samy's notes — session 3 (2026-07-14, run v_20260714_041639)
+1. "Only emojis are rendering — we need something pro: screenshots, PNGs, charts, animations, MOTION-GRAPHICS."
+2. "All of that should be animated as the talking goes."
+3. "A lot of black void spaces — not something people will watch."
+
+**Iteration (same day, pro-bar sprint):** KineticType v2 (power-word stacks slamming in at word timestamps — void class eliminated), Background v2 (dot grid + accent blobs), idle motion on every element, NEW chart_pop treatment (animated bar/line charts), variety law (emoji ≤50% of visual beats), logo-ambiguity law (no logos for name-colliding niche tools — a Hermès Paris logo appeared on an AI-agents beat and was surgically replaced), off-by-one anchor forgiveness + orphan pruning (fixed a pass-B failure chain). Result: `runs/v_20260714_053419/out/final.mp4` — 7 treatment types, 50% coverage, OpenAI-vs-cloud versus beat, tech bed. Frames eye-checked.
+
 ## Iterations
 **2026-07-12 (post-mortem package, commit-tracked):**
 - Abstract-topic rule (Samy's prompt rule 12) now backed by a deterministic law: photo/screenshot/logo asset requests must reference a spoken word or they're rejected/dropped. Reverted the 0.30 SigLIP floor (would have disabled the asset engine); kept 0.05.
