@@ -9,7 +9,7 @@ import {AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig} from 'r
 import type {Tokens} from '../tokens';
 import type {Beat} from '../types';
 import type {AssetMap} from './common';
-import {src, useAssetWindow} from './common';
+import {seeded, src, useAssetWindow, useIdle} from './common';
 
 export const ScreenshotZoom: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> = ({
   beat, assets, tokens,
@@ -17,8 +17,10 @@ export const ScreenshotZoom: React.FC<{beat: Beat; assets: AssetMap; tokens: Tok
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
   const heroRef = beat.assets.find((a) => a.role === 'hero') ?? beat.assets[0];
+  const {visible, enter, exit, enterF, exitF} = useAssetWindow(
+    heroRef ?? {asset_id: '', role: 'hero', enter_ms: 0, exit_ms: 1}, tokens, 'gentle');
+  const idle = useIdle(enterF + 16, seeded(beat.id, 5), 6, 3.4);
   if (!heroRef) return null;
-  const {visible, enter, exit, enterF, exitF} = useAssetWindow(heroRef, tokens, 'gentle');
   const asset = assets[heroRef.asset_id];
   if (!asset || !visible) return null;
 
@@ -34,7 +36,7 @@ export const ScreenshotZoom: React.FC<{beat: Beat; assets: AssetMap; tokens: Tok
           position: 'absolute',
           left: '50%',
           top: `${tokens.screenshot.yCenter * 100}%`,
-          transform: `translate(-50%, -50%) translateY(${(1 - enter) * 60}px)`,
+          transform: `translate(-50%, -50%) translateY(${(1 - enter) * 60 + idle.y}px) rotate(${idle.rot * 0.5}deg)`,
           opacity: Math.min(enter * 1.3, 1) * exit,
           width: tokens.canvas.width * tokens.screenshot.maxWidthFrac,
           borderRadius: tokens.screenshot.frameRadius,

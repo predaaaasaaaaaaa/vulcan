@@ -4,6 +4,7 @@ import React from 'react';
 import type {Tokens} from '../tokens';
 import type {Beat, Treatment} from '../types';
 import type {AssetMap} from './common';
+import {ChartPop} from './ChartPop';
 import {CutoutPop} from './CutoutPop';
 import {EmojiBurst} from './EmojiBurst';
 import {KineticType} from './KineticType';
@@ -26,4 +27,5 @@ export const TREATMENTS: Record<Treatment, TreatmentComponent> = {
   logo_versus: LogoVersus,
   emoji_burst: EmojiBurst,
   quote_card: QuoteCard,
+  chart_pop: ChartPop,
 };

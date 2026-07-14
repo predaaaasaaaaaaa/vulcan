@@ -8,7 +8,7 @@ import {AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig}
 import type {Tokens} from '../tokens';
 import type {Beat} from '../types';
 import type {AssetMap} from './common';
-import {Glow, seeded, src, useAssetWindow} from './common';
+import {Glow, seeded, src, useAssetWindow, useIdle} from './common';
 
 export const EmojiBurst: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> = ({
   beat, assets, tokens,
@@ -16,13 +16,15 @@ export const EmojiBurst: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const heroRef = beat.assets.find((a) => a.role === 'hero') ?? beat.assets[0];
+  const {visible, enter, exit, enterF} = useAssetWindow(
+    heroRef ?? {asset_id: '', role: 'hero', enter_ms: 0, exit_ms: 1}, tokens, 'slam');
+  const idle = useIdle(enterF + 14, seeded(beat.id, 11));
   if (!heroRef) return null;
-  const {visible, enter, exit, enterF} = useAssetWindow(heroRef, tokens, 'slam');
   const asset = assets[heroRef.asset_id];
   if (!asset || !visible) return null;
 
   const y = tokens.emojiBurst.yCenter * 100;
-  const rot = (1 - enter) * -24 + seeded(beat.id, 3) * 8 - 4;
+  const rot = (1 - enter) * -24 + seeded(beat.id, 3) * 8 - 4 + idle.rot;
 
   // burst particles fly out over 14 frames after entrance
   const burstT = interpolate(frame - enterF, [3, 17], [0, 1], {
@@ -59,7 +61,8 @@ export const EmojiBurst: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}
           position: 'absolute',
           left: '50%',
           top: `${y}%`,
-          transform: `translate(-50%, -50%) scale(${enter}) rotate(${rot}deg)`,
+          transform: `translate(-50%, -50%) translateY(${idle.y}px) `
+            + `scale(${enter * idle.pulse}) rotate(${rot}deg)`,
           opacity: exit,
           width: tokens.emojiBurst.heroSizePx,
           height: tokens.emojiBurst.heroSizePx,

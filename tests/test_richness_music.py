@@ -61,6 +61,60 @@ def test_manifest_with_music_validates():
     assert validate_manifest(m) == []
 
 
+# --- variety + chart_pop ---
+
+def test_variety_guard_rejects_all_emoji():
+    from vulcan.director.passes import variety_problems
+    out = bare_bout()
+    for b in out["beats"]:
+        b["treatment"] = "emoji_burst"
+        b["assets"] = [{"label": "fire", "type": "emoji", "role": "hero",
+                        "queries": ["🔥", "fire", "flame"], "enter_word": 0}]
+    # need ≥4 visual beats for the guard — replicate beats
+    while len(out["beats"]) < 4:
+        clone = dict(out["beats"][0]); clone_id = f"b{len(out['beats'])+1:02d}"
+        out["beats"].append({**clone, "id": clone_id})
+    skel4 = SKEL + [dict(SKEL[-1])] * (len(out["beats"]) - len(SKEL))
+    # simpler: construct manifest directly
+    m = {"beats": [{"id": b["id"], "treatment": "emoji_burst", "assets": [1]} for b in out["beats"]]}
+    assert variety_problems(m)
+    m2 = {"beats": [
+        {"id": "b01", "treatment": "emoji_burst", "assets": [1]},
+        {"id": "b02", "treatment": "chart_pop", "assets": []},
+        {"id": "b03", "treatment": "quote_card", "assets": []},
+        {"id": "b04", "treatment": "emoji_burst", "assets": [1]},
+    ]}
+    assert variety_problems(m2) == []
+
+def test_chart_pop_requires_payload():
+    from vulcan.validate import validate_manifest
+    out = bare_bout()
+    out["beats"][0]["treatment"] = "chart_pop"
+    m = assemble_manifest("v_test_ch1", "mastered.wav", DUR, SKEL, WORDS, out)
+    errs = validate_manifest(m)
+    assert any("E_PAYLOAD_MISSING" in e for e in errs)
+
+def test_chart_pop_valid_payload_passes():
+    from vulcan.validate import validate_manifest
+    out = bare_bout()
+    out["beats"][0]["treatment"] = "chart_pop"
+    out["beats"][0]["payload"] = {"chart": {"kind": "bar_down", "label": "COSTS"}}
+    m = assemble_manifest("v_test_ch2", "mastered.wav", DUR, SKEL, WORDS, out)
+    assert validate_manifest(m) == []
+    assert m["beats"][0]["payload"]["chart"]["kind"] == "bar_down"
+
+def test_lenient_drops_malformed_chart_and_downgrades():
+    from vulcan.validate import validate_manifest
+    out = bare_bout()
+    out["beats"][0]["treatment"] = "chart_pop"
+    out["beats"][0]["payload"] = {"chart": {"kind": "pie_3d", "label": ""}}
+    notes = []
+    m = assemble_manifest("v_test_ch3", "mastered.wav", DUR, SKEL, WORDS, out,
+                          lenient=True, notes=notes)
+    assert validate_manifest(m) == []
+    assert m["beats"][0]["treatment"] == "kinetic_type"
+
+
 # --- emoji name resolution (the 404 class) ---
 
 def test_name_variants_strip_filler():

@@ -18,7 +18,8 @@ from .paths import SCHEMA_PATH, SFX_INDEX
 
 # Treatments that carry a visual element even without a fetched asset.
 VISUAL_TREATMENTS = {"cutout_pop", "stat_slam", "list_stack", "tweet_card",
-                     "screenshot_zoom", "logo_versus", "emoji_burst", "quote_card"}
+                     "screenshot_zoom", "logo_versus", "emoji_burst", "quote_card",
+                     "chart_pop"}
 
 
 def visual_coverage(manifest: dict) -> float:
@@ -41,6 +42,7 @@ _ROLE_REQUIREMENTS = {
 # Treatment → required payload key.
 _PAYLOAD_REQUIREMENTS = {
     "stat_slam": "stat_text",
+    "chart_pop": "chart",
     "list_stack": "items",
     "tweet_card": "tweet",
     "quote_card": "quote",

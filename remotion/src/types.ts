@@ -4,7 +4,7 @@ export type Word = {w: string; s: number; e: number; p?: number};
 
 export type Treatment =
   | 'kinetic_type' | 'cutout_pop' | 'stat_slam' | 'list_stack' | 'tweet_card'
-  | 'screenshot_zoom' | 'logo_versus' | 'emoji_burst' | 'quote_card';
+  | 'screenshot_zoom' | 'logo_versus' | 'emoji_burst' | 'quote_card' | 'chart_pop';
 
 export type AssetRole = 'hero' | 'secondary' | 'background' | 'left' | 'right';
 export type CameraMove = 'static' | 'punch_in' | 'drift';
@@ -27,6 +27,7 @@ export type TextOverlay = {
 
 export type Payload = {
   stat_text?: string;
+  chart?: {kind: 'bar_up' | 'bar_down' | 'line_up' | 'line_down'; label: string};
   items?: {text: string; at_ms: number}[];
   tweet?: {author: string; handle: string; text: string};
   quote?: {text: string; attribution: string};

@@ -105,10 +105,12 @@ def beat_plan(W, sk):
              assets=[{"asset_id": "a03", "role": "hero", "enter_ms": rel(12, 51), "exit_ms": L(12)}],
              sfx=[{"cue": "whoosh_01", "at_ms": max(rel(12, 51) - 80, 0)}],
              camera="punch_in", transition_out="hard_cut"),
-        # b14 "while scratching for grain,"
-        dict(treatment=K,
+        # b14 "while scratching for grain," — exercises chart_pop
+        dict(treatment="chart_pop",
              text_overlay={"mode": "karaoke", "emphasis_words": ["scratching"]},
-             assets=[], sfx=[], camera="drift", transition_out="hard_cut"),
+             assets=[], sfx=[{"cue": "tick_02", "at_ms": 200}],
+             camera="static", transition_out="hard_cut",
+             payload={"chart": {"kind": "bar_up", "label": "GRAIN"}}),
         # b15 "found a pearl."
         dict(treatment="cutout_pop",
              text_overlay={"mode": "karaoke", "emphasis_words": ["pearl"]},

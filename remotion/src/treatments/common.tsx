@@ -56,3 +56,17 @@ export const seeded = (beatId: string, salt: number): number => {
   for (let i = 0; i < beatId.length; i++) h = (h * 31 + beatId.charCodeAt(i)) % 997;
   return (h % 200) / 200; // 0..1
 };
+
+/** Idle life for landed elements: gentle bob + sway. Nothing sits still —
+ * static heroes read as screenshots, not motion graphics. */
+export const useIdle = (sinceFrame: number, seed: number, ampPx = 9, periodS = 2.9) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const t = Math.max(frame - sinceFrame, 0) / fps;
+  const phase = seed * Math.PI * 2;
+  return {
+    y: Math.sin((t / periodS) * Math.PI * 2 + phase) * ampPx,
+    rot: Math.sin((t / (periodS * 1.7)) * Math.PI * 2 + phase) * 1.3,
+    pulse: 1 + Math.sin((t / (periodS * 1.3)) * Math.PI * 2 + phase) * 0.012,
+  };
+};
