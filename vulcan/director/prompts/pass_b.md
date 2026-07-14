@@ -27,6 +27,9 @@ RULES (hard):
 10. The FIRST beat is the hook: strong treatment (cutout_pop / stat_slam / emoji_burst if possible), punch_in, an sfx on the entrance.
 11. The LAST beat should land: quote_card / emoji_burst / stat_slam if the words allow, transition_out=hard_cut.
 12. **ABSTRACT-TOPIC RULE (hard):** If the beat contains NO concrete proper noun (person, place, brand, named product), NO specific number, and NO visualizable object — DO NOT request cutout_pop / screenshot_zoom / logo_versus. Only these treatments are valid for abstract beats: kinetic_type, stat_slam (only if a number is spoken), emoji_burst, list_stack, quote_card, tweet_card. For purely-opinion / commentary / thesis beats, default to kinetic_type + emoji_burst on the anchor emotion. Never scrape random objects (animals, generic icons, stock metaphors) to "represent" an idea — the visual must be the WORDS, not a literal image chosen by the LLM.
+13. **RICHNESS QUOTA (hard — a validator counts):** at least 40% of all beats must carry a visual element (an asset, or one of: stat_slam / list_stack / tweet_card / screenshot_zoom / logo_versus / emoji_burst / quote_card). Rule 12 restricts WHICH visuals abstract beats may use — it does NOT mean "make everything kinetic_type". Abstract/commentary content gets its richness from **emoji_burst** (always legal — pick the emotion/metaphor emoji: 🚀 growth, 💸 cost, ⚠️ warning, 🤖 AI/agents, 📈 scale, 🧠 thinking, 🔥 strong claim), **quote_card** (the thesis line, attribution = the speaker or "The take"), **stat_slam** (any spoken number), **list_stack** (any enumeration). A manifest of mostly-bare kinetic_type beats WILL BE REJECTED. b01 (hook) and the final beat MUST be visual.
+14. **EMOJI ASSETS (hard):** for type=emoji, queries[0] MUST be the literal emoji character itself (e.g. "🤖" — never the words "robot emoji"). queries[1..2] are the plain unicode name ("robot", "warning"). Wrong: ["robot face png"]. Right: ["🤖", "robot", "robot face"].
+15. **MUSIC:** pick ONE `music_mood` for the whole video from: energetic (hype, bold claims, callouts) | chill (storytelling, advice) | dramatic (warnings, stakes, fear) | uplifting (wins, growth, motivation) | tech (AI/software/builder content) | none (only if music would clash). Match the SPEECH's energy.
 
 ## SFX MENU (id — feel)
 whoosh_01 fast airy · whoosh_02 deep · whoosh_03 short whip · whoosh_04 double · whoosh_05 reverse swell
@@ -47,7 +50,8 @@ camera_01 shutter · cash_01 ka-ching · alarm_01 alert blip · heartbeat_01 hea
 
 ## OUTPUT CONTRACT
 ```json
-{"beats": [
+{"music_mood": "tech",
+ "beats": [
   {"id": "b01", "treatment": "...", "overlay_mode": "karaoke",
    "emphasis_words": ["..."],
    "assets": [{"label": "...", "type": "photo_cutout|3d_icon|flat_icon|logo|emoji|screenshot",
@@ -69,7 +73,8 @@ b04 [words 17-17, 1.6s]: 17:completely
 ```
 Output:
 ```json
-{"beats": [
+{"music_mood": "energetic",
+ "beats": [
   {"id": "b01", "treatment": "kinetic_type", "overlay_mode": "karaoke",
    "emphasis_words": ["Nobody", "this"],
    "assets": [], "sfx": [{"cue": "riser_01", "at_word": 0}],

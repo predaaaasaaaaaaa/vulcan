@@ -121,6 +121,24 @@ agent relays them with its `send_message` tool (Telegram sends `.mp4` as native
 video; 50MB bot cap → CRF 23 keeps 3min ≈ 35MB). Fallback `direct_bot` mode
 (Bot API with the token from Hermes's `.env`) exists but is off by default.
 
+### Music beds (`sfx/music/`)
+Five synthesized mood loops (energetic / chill / dramatic / uplifting / tech),
+CC0-by-construction like the SFX (`sfx/music/build_music.py`), normalized to
+sit ≈14 LU under the voice. The Director picks ONE `music_mood` per video
+(menu in pass_b rule 15); the renderer loops the bed with **deterministic
+word-driven ducking** — the word timestamps are the sidechain: −7dB while
+speech is active, breathing back up in real pauses. `audio.music_bed: false`
+in config.yaml turns the whole system off.
+
+### Visual-richness law
+A structurally-valid manifest can still be creatively empty (learned the hard
+way: a green pipeline once shipped 92s of captions on black). Three gates now
+make that impossible: pass B rejects manifests where <35% of beats carry a
+visual element (retry with the bare beats named); stage 4 aborts if asset
+failures collapse coverage below 20%; QC re-checks the final manifest the
+same way. Emoji bursts are always a legal visual — even fully abstract
+commentary can meet the floor.
+
 ### SFX library (`sfx/`)
 43 cues, **synthesized from scratch** with seeded numpy/scipy DSP
 (`sfx/build_sfx.py`): overlap-crossfaded bandpass-swept whooshes, FM bells,

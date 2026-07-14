@@ -1,0 +1,29 @@
+{
+ "beds": {
+  "energetic": {
+   "file": "music/bed_energetic.wav",
+   "bpm": 104,
+   "loop_s": 16.154
+  },
+  "chill": {
+   "file": "music/bed_chill.wav",
+   "bpm": 82,
+   "loop_s": 14.634
+  },
+  "dramatic": {
+   "file": "music/bed_dramatic.wav",
+   "bpm": 72,
+   "loop_s": 16.667
+  },
+  "uplifting": {
+   "file": "music/bed_uplifting.wav",
+   "bpm": 112,
+   "loop_s": 15.0
+  },
+  "tech": {
+   "file": "music/bed_tech.wav",
+   "bpm": 96,
+   "loop_s": 15.0
+  }
+ }
+}

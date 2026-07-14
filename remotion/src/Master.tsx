@@ -10,6 +10,7 @@ import {Background} from './Background';
 import {Captions} from './Captions';
 import {Camera} from './Camera';
 import {ensureFont} from './fonts';
+import {MusicBed} from './MusicBed';
 import {SfxLayer, SfxIndex} from './Sfx';
 import {withAccent} from './tokens';
 import {TransitionWrap} from './Transitions';
@@ -53,6 +54,13 @@ export const Master: React.FC<MasterProps & {sfxIndex?: SfxIndex}> = ({manifest,
       })}
       <Audio src={staticFile(manifest.audio.path)} volume={1} />
       <SfxLayer beats={manifest.beats} sfxIndex={sfxIndex} />
+      {manifest.music && manifest.music.file && manifest.music.mood !== 'none' ? (
+        <MusicBed
+          beats={manifest.beats}
+          file={`sfx/${manifest.music.file}`}
+          durationMs={manifest.audio.duration_ms}
+        />
+      ) : null}
     </AbsoluteFill>
   );
 };

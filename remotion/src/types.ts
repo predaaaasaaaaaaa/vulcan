@@ -62,6 +62,7 @@ export type Manifest = {
   audio: {path: string; duration_ms: number};
   beats: Beat[];
   assets: ManifestAsset[];
+  music?: {mood: 'energetic' | 'chill' | 'dramatic' | 'uplifting' | 'tech' | 'none'; file: string | null};
   post_kit?: {hook: string; caption: string; hashtags: string[]};
 };
 

@@ -18,7 +18,13 @@ export const KineticType: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
 
-  const ghost = (beat.text_overlay.emphasis_words ?? [])[0];
+  // never render a bare beat: no emphasis word → ghost the longest word
+  // (a 92s video of caption-only beats reads as "black screen", post-mortem 2)
+  const fallback = [...beat.words]
+    .map((w) => w.w.replace(/[^\p{L}\p{N}'-]/gu, ''))
+    .filter((w) => w.length >= 4)
+    .sort((a, b) => b.length - a.length)[0];
+  const ghost = (beat.text_overlay.emphasis_words ?? [])[0] ?? fallback;
   if (!ghost) return null;
 
   // ghost anticipates its word: enters at the word start OR 40% through the

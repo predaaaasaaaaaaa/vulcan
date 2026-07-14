@@ -110,6 +110,17 @@ def run_qc(mp4: Path, manifest: dict, qc_dir: Path) -> dict:
     if abs(lufs - config.get("audio.target_lufs", -14.0)) > cfg["lufs_tolerance"]:
         problems.append(f"program loudness {lufs} LUFS outside -14±{cfg['lufs_tolerance']}")
 
+    # Visual-richness gate (post-mortem 2026-07-14: a technically-perfect run
+    # shipped 92s of captions on black). Measured on the FINAL manifest, i.e.
+    # after asset failures degraded beats — the user-facing truth.
+    from .validate import visual_coverage
+    min_cov = cfg.get("min_visual_coverage", 0.20)
+    cov = visual_coverage(manifest)
+    if cov < min_cov:
+        problems.append(
+            f"visual coverage {cov:.0%} below floor {min_cov:.0%} — the video is "
+            "text-only (assets failed or the Director under-planned); not shippable")
+
     metrics = {
         "duration_ms": dur_ms, "size_mb": round(size_mb, 2), "lufs": lufs,
         "frames_sampled": len(frames), "contact_sheet": str(sheet),

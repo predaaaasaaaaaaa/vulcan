@@ -29,6 +29,15 @@
       "maxItems": 60,
       "items": { "$ref": "#/$defs/asset" }
     },
+    "music": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mood", "file"],
+      "properties": {
+        "mood": { "enum": ["energetic", "chill", "dramatic", "uplifting", "tech", "none"] },
+        "file": { "type": ["string", "null"] }
+      }
+    },
     "post_kit": {
       "type": "object",
       "additionalProperties": false,

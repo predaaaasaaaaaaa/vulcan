@@ -163,6 +163,15 @@ def cmd_run(args: argparse.Namespace) -> int:
                         status(f"asset fallback: {b['id']} → kinetic_type (failed: {failed})")
             manifest["assets"] = [a for a in manifest["assets"] if a["asset_id"] not in failed]
         (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
+        from .validate import visual_coverage
+        cov = visual_coverage(manifest)
+        if cov < config.get("qc.min_visual_coverage", 0.20):
+            print(f"ERROR visual coverage collapsed to {cov:.0%} after asset failures "
+                  f"({failed}) — refusing to render a text-only video. "
+                  "Re-run (sources may recover) or re-phrase the note.")
+            return 3
+        if failed:
+            status(f"WARN visual coverage {cov:.0%} after asset fallbacks ({len(failed)} failed)")
         errs = validate_manifest(manifest, for_render=True)
         if errs:
             print(f"ERROR manifest failed render gate: {errs[:5]}")

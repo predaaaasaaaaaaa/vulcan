@@ -39,6 +39,14 @@ def _retries() -> int:
     return config.get("director.max_retries_per_pass", 3)
 
 
+def _music_index() -> dict:
+    from ..paths import SFX_DIR
+    try:
+        return json.loads((SFX_DIR / "music" / "index.json").read_text())["beds"]
+    except (OSError, KeyError, json.JSONDecodeError):
+        return {}
+
+
 # ------------------------------------------------------------------ PASS A
 
 def _word_list_for_prompt(words: list[dict]) -> str:
@@ -331,12 +339,50 @@ def assemble_manifest(video_id: str, audio_path: str, duration_ms: int,
             beat["payload"] = payload
         manifest_beats.append(beat)
 
+    # music mood: MiniMax picks from the menu; invalid/missing coerces to a
+    # safe default (music must never block a video)
+    mood = str(b_out.get("music_mood") or "").strip().lower()
+    music_index = _music_index()
+    if mood == "none":
+        music = {"mood": "none", "file": None}
+    elif mood in music_index:
+        music = {"mood": mood, "file": music_index[mood]["file"]}
+    else:
+        if mood:
+            notes.append(f"unknown music_mood {mood!r} — defaulting to chill")
+        music = {"mood": "chill", "file": music_index.get("chill", {}).get("file")}
+
     return {
         "video_id": video_id, "fps": 30, "aspect": "9:16",
         "audio": {"path": audio_path, "duration_ms": duration_ms},
         "beats": manifest_beats,
         "assets": list(assets_registry.values()),
+        "music": music,
     }
+
+
+from ..validate import VISUAL_TREATMENTS  # noqa: E402  (shared with the QC gate)
+
+
+def richness_problems(manifest: dict, floor: float) -> list[str]:
+    """The anemic-manifest guard (post-mortem 2: 27/28 bare kinetic beats
+    shipped a 'black screen with captions'). A beat counts as VISUAL when it
+    carries an asset or a payload treatment. Below the floor → injectable
+    error naming the barest stretch so MiniMax knows exactly where to enrich."""
+    beats = manifest["beats"]
+    visual = [b["id"] for b in beats if b["assets"] or b["treatment"] in VISUAL_TREATMENTS]
+    ratio = len(visual) / max(len(beats), 1)
+    if ratio >= floor:
+        return []
+    bare = [b["id"] for b in beats if not (b["assets"] or b["treatment"] in VISUAL_TREATMENTS)]
+    return [
+        f"VISUAL RICHNESS too low: only {len(visual)}/{len(beats)} beats "
+        f"({ratio:.0%}) carry a visual element (need ≥{floor:.0%}). This renders as "
+        f"text-on-black. Add emoji_burst (always legal, even on abstract beats — "
+        f"queries[0] MUST be the literal emoji character), quote_card, stat_slam or "
+        f"cutout_pop (only for spoken concrete nouns) to these beats: "
+        f"{', '.join(bare[:10])}. The hook (b01) and the closer MUST be visual."
+    ]
 
 
 def pass_b(video_id: str, audio_path: str, duration_ms: int,
@@ -357,10 +403,22 @@ def pass_b(video_id: str, audio_path: str, duration_ms: int,
                                          skeleton, words, extract_json(text),
                                          lenient=lenient, notes=notes)
             for n in notes:
-                log.info("pass B lenient coercion: %s", n)
+                # WARNING, not INFO: "attempt 4, lenient" must not read as a
+                # clean pass in the forensic log (post-mortem 2, cause #4)
+                log.warning("pass B lenient coercion: %s", n)
             errs = validate_manifest(manifest, sfx_cues=sfx_cues)
             if errs:
                 raise ValueError("; ".join(errs[:8]))
+            floor = config.get("director.richness_floor", 0.35)
+            rich = richness_problems(manifest, floor)
+            if rich:
+                if not lenient:
+                    raise ValueError(rich[0])
+                # final attempt: a thin video may pass, an EMPTY one may not
+                hard = richness_problems(manifest, 0.20)
+                if hard:
+                    raise ValueError(hard[0] + " — refusing to ship a text-only video")
+                log.warning("pass B richness below target on lenient attempt: %s", rich[0][:180])
             log.info("pass B ok: %d beats, %d assets (attempt %d%s)",
                      len(manifest["beats"]), len(manifest["assets"]), attempt + 1,
                      ", lenient" if lenient and notes else "")

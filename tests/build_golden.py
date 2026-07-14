@@ -192,6 +192,7 @@ if __name__ == "__main__":
         "audio": {"path": "mastered.wav", "duration_ms": dur},
         "beats": beats,
         "assets": [{**a, "path": None, "status": "pending", "score": None} for a in ASSET_SPECS],
+        "music": {"mood": "chill", "file": "music/bed_chill.wav"},
     }
 
     errs = validate_manifest(manifest)

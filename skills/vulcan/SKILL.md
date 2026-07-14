@@ -162,6 +162,8 @@ line before the error; report the message; attach nothing; retry at most ONCE
 | 7/7 deliver | send the path in plain text: "Video ready at `runs/<id>/out/final.mp4` but Telegram delivery failed — possibly over 50MB." |
 | `ERROR no unconsumed voice note…` | "⚠️ I couldn't find a NEW voice note — the last one was already forged. Send a fresh one and say 'forge this'." |
 | `ERROR … MINIMAX_QUOTA …` | "⚠️ The MiniMax plan is out of credits — the director brain can't run. Top up / upgrade the MiniMax Token Plan (or wait for the reset), then re-send the note." **Do NOT retry — it's a quota, not a glitch.** |
+| `ERROR visual coverage collapsed …` | "⚠️ I couldn't source enough visuals for this one — rather than send you a text-only video I stopped. One retry usually fixes it (sources recover); naming things more concretely helps too." (this one IS worth one retry) |
+| qc: `visual coverage … below floor` | same message as above — the system refuses to ship caption-only videos by design |
 
 For any failure: `runs/<RUN_ID>/pipeline.log` holds the full forensic story —
 quote its last lines if the user asks what happened.

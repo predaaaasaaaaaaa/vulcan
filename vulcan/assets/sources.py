@@ -179,12 +179,41 @@ def fluent_emoji_by_char(emoji_char: str) -> list[Candidate]:
     return [c for name in candidates for c in fluent_emoji_by_name(name)]
 
 
+# Director queries arrive as prose ("warning emoji", "robot face") — strip the
+# filler or the folder guess 404s ("Warning emoji" is not a fluent folder;
+# "Warning" is). Root cause of the all-assets-404 run on 2026-07-14.
+_EMOJI_FILLER = {"emoji", "face", "sign", "icon", "symbol", "3d", "emote", "emoticon"}
+
+
+def _name_variants(name: str) -> list[str]:
+    words = [w for w in re.split(r"\s+", name.strip().lower()) if w]
+    variants = [name]
+    cleaned = [w for w in words if w not in _EMOJI_FILLER]
+    if cleaned and cleaned != words:
+        variants.append(" ".join(cleaned))
+    if len(cleaned) > 1:
+        variants.append(cleaned[0])
+    # "robot face" is literally "Robot" in fluent; keep both orders covered
+    seen, out = set(), []
+    for v in variants:
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
 def fluent_emoji_by_name(name: str) -> list[Candidate]:
-    folder, fname = _fluent_slug(name)
-    return [Candidate(
-        url=f"{_FLUENT_RAW}/{folder}/3D/{fname}".replace(" ", "%20"),
-        source="fluent3d", width=1024, height=1024, likely_alpha=True,
-    )]
+    out = []
+    for variant in _name_variants(name):
+        folder, fname = _fluent_slug(variant)
+        out.append(Candidate(
+            url=f"{_FLUENT_RAW}/{folder}/3D/{fname}".replace(" ", "%20"),
+            source="fluent3d", width=1024, height=1024, likely_alpha=True,
+        ))
+    # iconify mirrors the fluent-emoji set with fuzzy SEARCH — the safety net
+    # when folder guessing misses (rasterized at 1024 by the engine)
+    out += iconify(name, sets="fluent-emoji,fluent-emoji-flat", max_results=2)
+    return out
 
 
 # ---------------------------------------------------------------- waterfall

@@ -16,6 +16,20 @@ from jsonschema import Draft202012Validator
 
 from .paths import SCHEMA_PATH, SFX_INDEX
 
+# Treatments that carry a visual element even without a fetched asset.
+VISUAL_TREATMENTS = {"cutout_pop", "stat_slam", "list_stack", "tweet_card",
+                     "screenshot_zoom", "logo_versus", "emoji_burst", "quote_card"}
+
+
+def visual_coverage(manifest: dict) -> float:
+    """Fraction of beats carrying a visual element (asset or payload card)."""
+    beats = manifest["beats"]
+    if not beats:
+        return 0.0
+    visual = sum(1 for b in beats if b["assets"] or b["treatment"] in VISUAL_TREATMENTS)
+    return visual / len(beats)
+
+
 # Treatments that must reference at least one asset with the given role.
 _ROLE_REQUIREMENTS = {
     "cutout_pop": ("hero",),

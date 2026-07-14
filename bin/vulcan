@@ -1,3 +1,6 @@
 #!/usr/bin/env bash
 # VULCAN guarded actuator — the one CLI Hermes invokes.
+# cd first: `python -m vulcan.cli` needs the repo root on sys.path regardless
+# of the caller's cwd (a run from $HOME died with "No module named vulcan.cli").
+cd /home/preda/vulcan || exit 1
 exec /home/preda/vulcan/.venv/bin/python -m vulcan.cli "$@"

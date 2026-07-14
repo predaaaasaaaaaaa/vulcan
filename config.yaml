@@ -8,7 +8,7 @@ style:
 audio:
   target_lufs: -14.0
   sfx_lufs: -22.0
-  music_bed: false             # optional CC0 bed at -26 LUFS with ducking; default OFF
+  music_bed: true              # synthesized mood beds (sfx/music/), word-driven ducking in the renderer
   music_bed_lufs: -26.0
 
 asr:
@@ -25,6 +25,7 @@ director:
   temperature: 0.2
   max_tokens: 8000
   max_retries_per_pass: 3
+  richness_floor: 0.35         # min fraction of beats with a visual element (post-mortem 2026-07-14)
   timeout_s: 240
 
 beats:
@@ -59,6 +60,7 @@ qc:
   lufs_tolerance: 1.0
   frame_sample_every_s: 5
   min_luma_variance: 4.0       # calibrated Phase 4: dead 1.8-2.9, live >=4.5 (BUILDLOG)
+  min_visual_coverage: 0.20    # post-asset-failures floor: below this the video is text-only → fail loudly
 
 delivery:
   mode: hermes_send            # hermes_send | direct_bot (fallback)
