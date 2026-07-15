@@ -48,6 +48,9 @@ export const StatSlam: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> 
   }
 
   const scale = (0.86 + enter * 0.14) * (1 + settle * 0.06);
+  // long stat_text ("AT SCALE") overflowed the 1080px canvas at the fixed
+  // 240px size — fit the type to the frame deterministically
+  const fitSize = Math.min(tokens.stat.fontSize, Math.floor((1080 * 0.9) / Math.max(display.length, 1) / 0.62));
 
   return (
     <AbsoluteFill>
@@ -61,7 +64,7 @@ export const StatSlam: React.FC<{beat: Beat; assets: AssetMap; tokens: Tokens}> 
           opacity: Math.min(enter * 1.5, 1),
           fontFamily: tokens.font.family,
           fontWeight: tokens.font.weightBlack,
-          fontSize: tokens.stat.fontSize,
+          fontSize: fitSize,
           letterSpacing: '-0.04em',
           color: tokens.color.accent,
           textShadow: '0 10px 60px rgba(0,0,0,0.6)',
