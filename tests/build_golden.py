@@ -8,6 +8,7 @@ Run: .venv/bin/python tests/build_golden.py  → runs/golden/manifest.json
 import json
 import logging
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -163,8 +164,17 @@ ASSET_SPECS = [
 if __name__ == "__main__":
     (GOLDEN / "audio").mkdir(parents=True, exist_ok=True)
     (GOLDEN / "assets").mkdir(parents=True, exist_ok=True)
-    shutil.copy("runs/phase2_test/audio/mastered.wav", GOLDEN / "audio" / "mastered.wav")
-    shutil.copy("runs/phase2_test/words.json", GOLDEN / "words.json")
+    # The golden timeline ships as fixtures so any clone can rebuild it.
+    # Plain decode, NO re-mastering/ASR: the hand-cut word indices below are
+    # bound to this exact waveform — re-deriving them would drift the timeline.
+    master = GOLDEN / "audio" / "mastered.wav"
+    if not master.exists():
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", "fixtures/golden_master.ogg",
+             "-ac", "1", "-ar", "48000", str(master)],
+            check=True,
+        )
+    shutil.copy("fixtures/golden_words.json", GOLDEN / "words.json")
 
     wj = json.load(open(GOLDEN / "words.json"))
     words, dur = wj["words"], wj["duration_ms"]
