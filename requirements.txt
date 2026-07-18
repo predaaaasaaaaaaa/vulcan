@@ -13,3 +13,5 @@ onnxruntime>=1.18
 transformers>=4.44
 ddgs>=9.0
 requests>=2.32
+scipy>=1.11
+soundfile>=0.12
