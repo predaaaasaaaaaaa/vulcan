@@ -324,6 +324,11 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_setup_agent(args: argparse.Namespace) -> int:
+    from .setup_agent import cmd_setup_agent
+    return cmd_setup_agent(args)
+
+
 def main() -> None:
     # Wrong-interpreter trap (post-mortem: `python3 -m vulcan.cli` used the
     # system python, missing all deps, and the run died mid-pipeline with a
@@ -363,6 +368,12 @@ def main() -> None:
     p_cl.set_defaults(fn=cmd_cleanup)
 
     sub.add_parser("doctor", help="environment self-check").set_defaults(fn=cmd_doctor)
+
+    p_sa = sub.add_parser("setup-agent",
+                          help="write SKILL.md with this clone's paths and wire it into an agent")
+    p_sa.add_argument("agent", nargs="?", default="generic",
+                      choices=["hermes", "openclaw", "generic"])
+    p_sa.set_defaults(fn=_cmd_setup_agent)
 
     args = ap.parse_args()
     if args.cmd == "run" and not args.latest and not args.voice:
