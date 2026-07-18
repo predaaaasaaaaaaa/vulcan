@@ -15,4 +15,4 @@ inbox/
 # local agent/tool state — never ship
 /CLAUDE.md
 /.claude/
-skills/vulcan/SKILL.md
+skills/generated/

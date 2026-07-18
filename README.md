@@ -22,7 +22,7 @@ around one idea:
 ## Quickstart
 
 ```bash
-git clone <this-repo> ~/vulcan && cd ~/vulcan
+git clone https://github.com/predaaaasaaaaaaa/vulcan.git ~/vulcan && cd ~/vulcan
 ./setup.sh                                # prereqs → venv → deps → browser → sfx → doctor
 bin/vulcan run fixtures/fixture_60s.ogg   # full pipeline on the bundled test note
 bin/vulcan setup-agent hermes             # wire your agent (or: openclaw | generic)
@@ -216,7 +216,7 @@ gaps, orphans, hallucinated cues, out-of-range anchors, malformed payloads).
 │   ├── src/ (tokens, Master, Captions, Background, Camera, Transitions, Sfx, treatments/)
 │   └── public/ (fonts/Outfit committed; runs/ + sfx/ symlinks)
 ├── sfx/                 # 43 wavs + index.json + build_sfx.py
-├── skills/vulcan/       # SKILL.md.template → SKILL.md generated per-clone by setup-agent
+├── skills/vulcan/SKILL.md  # the agent skill (generic; setup-agent writes a path-bound copy to skills/generated/)
 ├── tests/               # 102 unit tests + phase3_gate.py + build_golden.py
 ├── fixtures/            # 62s + 150s public-domain test voice notes
 ├── cache/media.db       # cross-run asset cache with SigLIP embeddings
@@ -234,7 +234,7 @@ This is how VULCAN wires into a Hermes install at `~/.hermes` —
 1. **Trigger.** A Telegram voice note arrives → Hermes's gateway caches it at
    `~/.hermes/cache/audio/audio_<hex>.ogg` and hands the agent the transcript
    (never the path). The registered skill (`skills/vulcan/SKILL.md`,
-   discovered through `skills.external_dirs: [<abs-path-to-your-clone>/skills]` in
+   discovered through `skills.external_dirs: [<abs-path-to-your-clone>/skills/generated]` in
    `~/.hermes/config.yaml`) tells the agent: confirm once ("Forge this? y/n"),
    then run in a background terminal:
    ```bash
@@ -308,7 +308,7 @@ Hermes on another box, OpenClaw, a custom agent, anything that can run a CLI.)*
 
 ### Install
 ```bash
-git clone <this repo> ~/vulcan && cd ~/vulcan
+git clone https://github.com/predaaaasaaaaaaa/vulcan.git ~/vulcan && cd ~/vulcan
 ./setup.sh                              # prereq checks → venv (CPU torch when needed)
                                         # → npm install → headless-browser fallback
                                         # → SFX/music rebuild → bin/vulcan doctor

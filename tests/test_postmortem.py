@@ -161,3 +161,18 @@ def test_fallback_post_kit_is_schema_shaped():
     assert kit["hook"].startswith("The future belongs")
     assert len(kit["hashtags"]) == 5
     assert all(t.startswith("#") for t in kit["hashtags"])
+
+
+def test_failed_asset_dict_stays_schema_clean(tmp_path):
+    """A failed asset must not carry non-schema keys — breadcrumbs go to the
+    log. (A fresh-clone golden build once drowned the real E_ASSET error under
+    six E_SCHEMA hits from a leaked _failure_log key.)"""
+    from vulcan.assets.engine import _Breaker, resolve_asset
+    b = _Breaker()
+    while not b.tripped:
+        b.record(ok=False)
+    a = {"asset_id": "aX", "type": "photo_cutout", "queries": ["anything"],
+         "path": None, "status": "pending", "score": None}
+    out = resolve_asset(a, tmp_path, breaker=b)
+    assert out["status"] == "failed"
+    assert not [k for k in out if k.startswith("_")]

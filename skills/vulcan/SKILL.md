@@ -1,7 +1,7 @@
 ---
 name: vulcan
 description: "Forge a voice note into a publish-ready vertical video (1080×1920, kinetic captions, cutouts, SFX, frame-synced to the voice) and deliver it back on Telegram with a post kit. Use when the user sends a voice note asking for a video/reel/short, says 'forge this', 'make this a video', 'vulcan', or asks to clean up after taking a video."
-version: 1.2.0
+version: 1.3.0
 metadata:
   hermes:
     tags: [video, content, telegram, voice, reels, shorts]
@@ -18,6 +18,22 @@ approval.** Never edit VULCAN's files, never craft manifests yourself, never
 retry more than once.
 
 ---
+
+## 0. Paths in this file
+
+Every command below uses `{{VULCAN_ROOT}}` — the absolute path of the VULCAN
+clone, i.e. the directory two levels up from this SKILL.md. If you are reading
+a generated copy under `skills/generated/`, the real path is already
+substituted — skip to §1. If you can still see double-brace placeholders,
+resolve the root once and read every placeholder below as that path:
+
+```bash
+git -C "$(dirname "<path-to-this-SKILL.md>")" rev-parse --show-toplevel
+```
+
+Better: have your user run `<root>/bin/vulcan setup-agent <hermes|openclaw|generic>`
+once — it writes the substituted copy to `skills/generated/vulcan/SKILL.md`
+(and registers it, for Hermes), so you never see a placeholder at all.
 
 ## 1. Command reference (everything you may run)
 

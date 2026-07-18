@@ -82,8 +82,9 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
                   breaker: "_Breaker | None" = None) -> dict:
     """Fetch/validate one manifest asset in place. Returns the mutated dict.
 
-    Sets status=validated + path + score on success; status=failed with
-    _failure_log on exhaustion (the CLI then degrades its beats). Bounded by
+    Sets status=validated + path + score on success; status=failed on
+    exhaustion (failure trail in the log; the CLI then degrades its beats,
+    build_golden refuses). Bounded by
     MAX_ATTEMPTS_PER_ASSET, PER_ASSET_BUDGET_S and the stage circuit breaker.
     """
     if threshold is None:
@@ -186,9 +187,12 @@ def resolve_asset(asset: dict, out_dir: str | Path, threshold: float | None = No
         time.sleep(0.4)  # be polite between query variants
 
     asset["status"] = "failed"
-    asset["_failure_log"] = failures[-12:]
-    log.warning("asset %s FAILED after %d attempts (%s)", asset["asset_id"], attempts,
-                failures[-1] if failures else "no candidates")
+    # forensics go to the log, never onto the dict: manifest assets are
+    # schema-validated with additionalProperties:false, and a stray key here
+    # buries the real render-gate error under E_SCHEMA noise
+    log.warning("asset %s FAILED after %d attempts; failures: %s",
+                asset["asset_id"], attempts,
+                "; ".join(failures[-12:]) if failures else "no candidates")
     return asset
 
 
