@@ -8,3 +8,6 @@ remotion/out/
 .pytest_cache/
 sfx/*.wav
 fixtures/*.wav
+inbox/
+*.ogg
+!fixtures/*.ogg
