@@ -20,7 +20,8 @@ asr:
 director:
   base_url: "https://api.minimax.io/anthropic"
   api_key_env: "MINIMAX_API_KEY"
-  env_file: "/home/preda/.hermes/.env"   # key is READ from Hermes env at runtime, never stored
+  env_file: "~/.hermes/.env"   # key is READ from this file at runtime, never stored
+                               # (~ expands; override with VULCAN_ENV_FILE=/path/to/.env)
   model: "MiniMax-M3"
   temperature: 0.2
   max_tokens: 8000
@@ -70,9 +71,10 @@ delivery:
 trigger:
   auto_mode: false             # Hermes asks "Forge this? y/n" before running
   voice_latest_window_min: 15  # `vulcan run --latest` accepts oggs younger than this
-  voice_cache_dirs:
-    - "/home/preda/.hermes/cache/audio"
-    - "/home/preda/.hermes/audio_cache"
+  voice_cache_dirs:            # where your platform caches incoming voice notes
+                               # (~ expands; override with VULCAN_VOICE_DIRS=dir1:dir2)
+    - "~/.hermes/cache/audio"
+    - "~/.hermes/audio_cache"
 
 paths:
   runs_dir: "runs"

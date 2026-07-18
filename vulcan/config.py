@@ -28,13 +28,28 @@ def get(dotted: str, default=None):
     return node
 
 
+def env_file_path() -> Path:
+    """Secrets env file: $VULCAN_ENV_FILE overrides director.env_file; ~ expands."""
+    raw = os.environ.get("VULCAN_ENV_FILE") or load()["director"]["env_file"]
+    return Path(raw).expanduser()
+
+
+def voice_cache_dirs() -> list[Path]:
+    """Voice-note caches for `run --latest`: $VULCAN_VOICE_DIRS (colon-separated)
+    overrides trigger.voice_cache_dirs; ~ expands."""
+    raw = os.environ.get("VULCAN_VOICE_DIRS")
+    if raw:
+        return [Path(p).expanduser() for p in raw.split(":") if p]
+    return [Path(d).expanduser() for d in get("trigger.voice_cache_dirs", [])]
+
+
 def minimax_api_key() -> str:
     cfg = load()["director"]
     env_var = cfg["api_key_env"]
     key = os.environ.get(env_var)
     if key:
         return key
-    env_file = Path(cfg["env_file"])
+    env_file = env_file_path()
     if env_file.exists():
         for line in env_file.read_text().splitlines():
             line = line.strip()
@@ -54,7 +69,7 @@ def telegram_env(name_key: str) -> str | None:
     val = os.environ.get(env_var)
     if val:
         return val
-    env_file = Path(load()["director"]["env_file"])
+    env_file = env_file_path()
     if env_file.exists():
         for line in env_file.read_text().splitlines():
             line = line.strip()

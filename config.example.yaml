@@ -1,0 +1,102 @@
+# VULCAN configuration — fully commented reference.
+# config.yaml (the live file) ships with working defaults for a Hermes install
+# (~/.hermes). If you run a different agent or layout, either edit config.yaml
+# or override the two path-ish settings without touching the file:
+#
+#   VULCAN_ENV_FILE=/path/to/.env       # where the Director API key is read from
+#   VULCAN_VOICE_DIRS=/dir/a:/dir/b     # colon-separated caches for `run --latest`
+#
+# Every path here supports ~ expansion. Calibrated values cite the BUILDLOG
+# phase that set them — recalibrate on your own corpus before changing them.
+
+style:
+  accent_color: "#FFCC00"      # the ONE brand color — captions, underlines, charts,
+                               # blobs all derive from it. Change this to re-skin
+                               # every video. All other style tokens live in
+                               # remotion/src/tokens.ts.
+  font_family: "Outfit"        # committed .ttf in remotion/public/fonts — no runtime
+                               # fetch. Swap the file + this name to change type.
+
+audio:
+  target_lufs: -14.0           # platform loudness target (TikTok/Reels/Shorts spec)
+  sfx_lufs: -22.0              # SFX bus level relative to full scale
+  music_bed: true              # synthesized mood beds (sfx/music/) under the voice,
+                               # word-driven ducking in the renderer. false = no music.
+  music_bed_lufs: -26.0        # bed level; ~14 LU under the voice reads as "produced"
+
+asr:
+  engine: faster-whisper       # benchmarked 25x faster than whisperx on CPU for
+                               # ±200ms boundary difference (BUILDLOG Phase 2)
+  model: small                 # small beats base on confidence; carries French well
+  compute_type: int8           # CPU inference
+  language: null               # null = auto-detect per note (en/fr verified)
+
+director:
+  # Any Anthropic-compatible /v1/messages endpoint works. An OpenAI-style
+  # endpoint needs ~30 lines changed in vulcan/director/client.py.
+  base_url: "https://api.minimax.io/anthropic"
+  api_key_env: "MINIMAX_API_KEY"   # env var NAME holding the key
+  env_file: "~/.hermes/.env"       # file the key is READ from at call time if the
+                                   # env var isn't set — never copied, never logged.
+                                   # Non-Hermes: point at any dotenv-style file
+                                   # (or export the env var / set VULCAN_ENV_FILE).
+  model: "MiniMax-M3"
+  temperature: 0.2             # low — the Director picks from menus, it doesn't write
+  max_tokens: 8000
+  max_retries_per_pass: 3      # validator errors are injected verbatim into retries
+  richness_floor: 0.35         # min fraction of beats carrying a visual element;
+                               # strict passes reject below this (post-mortem 2026-07-14)
+  timeout_s: 240
+
+beats:
+  min_ms: 1200                 # beat-length law: 1.2–5.0s, enforced by validator,
+  max_ms: 5000                 #   repaired mechanically by repair_cuts (never re-asked)
+  pause_split_ms: 350          # silence >= this is a legal cut point
+
+assets:
+  min_edge_px: 500             # reject tiny sources before stamping
+  siglip_model: "google/siglip-base-patch16-224"
+  # Relevance gate for SEARCH-sourced images. Calibrated on 10 good/bad pairs:
+  # good >= 0.078, bad <= 0.013 (BUILDLOG Phase 3). Do NOT raise this without
+  # recalibrating on your corpus — 0.30 would reject every correct match ever
+  # measured (best good pair: 0.168) and silently disable the asset engine.
+  siglip_threshold: 0.05
+  max_per_beat: 3
+  cache_db: "cache/media.db"   # cross-run asset cache (SigLIP-embedding lookup)
+
+render:
+  fps: 30
+  width: 1080                  # 9:16 vertical, non-negotiable for the treatments
+  height: 1920
+  crf: 23                      # tuned so a 3-min video stays <= 45MB (Phase 4)
+  concurrency: 4               # calibrated on 12 threads / 7GB RAM — lower it if
+                               # the render OOMs, raise it on beefier machines
+  timeout_min: 30
+
+qc:
+  duration_delta_ms: 150       # video may differ from audio by at most this
+  max_size_mb: 45              # under Telegram's 50MB bot cap with margin
+  lufs_tolerance: 1.0
+  frame_sample_every_s: 5      # dead-frame scan sampling interval
+  min_luma_variance: 4.0       # calibrated: dead frames 1.8–2.9, live >= 4.5 (Phase 4)
+  min_visual_coverage: 0.20    # below this after asset failures the run aborts —
+                               # a text-only video never ships silently
+
+delivery:
+  mode: hermes_send            # hermes_send = print DELIVER MEDIA:<path> lines for
+                               # the agent to relay (works for ANY agent platform).
+                               # direct_bot = send via Telegram Bot API yourself.
+  bot_token_env: "TELEGRAM_BOT_TOKEN"      # only read in direct_bot mode
+  chat_id_env: "TELEGRAM_HOME_CHANNEL"     # only read in direct_bot mode
+
+trigger:
+  auto_mode: false             # false = your agent asks "Forge this? y/n" first
+  voice_latest_window_min: 15  # `run --latest` only accepts notes younger than this
+  voice_cache_dirs:            # where your platform caches incoming voice notes;
+                               # list yours here (or set VULCAN_VOICE_DIRS)
+    - "~/.hermes/cache/audio"
+    - "~/.hermes/audio_cache"
+
+paths:
+  runs_dir: "runs"             # per-run audit trails land here (repo-relative)
+  sfx_index: "sfx/index.json"  # the SFX contract the Director picks from

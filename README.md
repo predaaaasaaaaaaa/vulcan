@@ -210,18 +210,18 @@ This is wired into the Hermes install at `~/.hermes` on this machine
 1. **Trigger.** A Telegram voice note arrives → Hermes's gateway caches it at
    `~/.hermes/cache/audio/audio_<hex>.ogg` and hands the agent the transcript
    (never the path). The registered skill (`skills/vulcan/SKILL.md`,
-   discovered through `skills.external_dirs: [/home/preda/vulcan/skills]` in
+   discovered through `skills.external_dirs: [<abs-path-to-your-clone>/skills]` in
    `~/.hermes/config.yaml`) tells the agent: confirm once ("Forge this? y/n"),
    then run in a background terminal:
    ```bash
-   /home/preda/vulcan/bin/vulcan run --latest
+   ~/vulcan/bin/vulcan run --latest
    ```
    `--latest` resolves the newest cached ogg (≤15 min) itself — the agent
    never types a file path, so it can't hallucinate one.
 2. **Status.** The CLI prints `STATUS n/7 …` lines; the skill relays a short
    progress message at stages 1/3/5/7.
 3. **Delivery.** On `DONE`, the agent sends a message containing
-   `MEDIA:/home/preda/vulcan/runs/<id>/out/final.mp4` (Hermes's media
+   `MEDIA:<clone>/runs/<id>/out/final.mp4` (Hermes's media
    convention → native Telegram video), then the post kit text.
 4. **Failure.** The skill maps each failing stage to an exact user-facing
    message (see SKILL.md playbook); max one retry; artifacts stay in

@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 from . import config
-from .paths import RUNS_DIR
+from .paths import ROOT, RUNS_DIR
 
 log = logging.getLogger("vulcan")
 
@@ -62,7 +62,7 @@ def mark_voice_consumed(voice: Path, video_id: str) -> None:
 def find_latest_voice() -> Path:
     """Newest UNCONSUMED .ogg in the Hermes audio caches within the window."""
     window_min = config.get("trigger.voice_latest_window_min", 15)
-    dirs = [Path(d) for d in config.get("trigger.voice_cache_dirs", [])]
+    dirs = config.voice_cache_dirs()
     consumed = set(_load_ledger().keys())
     candidates: list[tuple[float, Path]] = []
     skipped = 0
@@ -334,7 +334,7 @@ def main() -> None:
         import jsonschema  # noqa: F401
     except ImportError as e:
         print(f"ERROR missing dependency ({e.name}) — you are running the wrong Python "
-              f"({sys.executable}). Invoke VULCAN via /home/preda/vulcan/bin/vulcan "
+              f"({sys.executable}). Invoke VULCAN via {ROOT}/bin/vulcan "
               "(it pins the project venv).")
         sys.exit(2)
 

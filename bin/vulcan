@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# VULCAN guarded actuator — the one CLI Hermes invokes.
+# VULCAN guarded actuator — the one CLI an agent invokes.
+# Self-locating: the repo root is derived from this script's real path
+# (readlink -f follows symlinks, e.g. ~/.local/bin/vulcan), so any clone
+# location works without editing this file.
 # cd first: `python -m vulcan.cli` needs the repo root on sys.path regardless
 # of the caller's cwd (a run from $HOME died with "No module named vulcan.cli").
-cd /home/preda/vulcan || exit 1
-exec /home/preda/vulcan/.venv/bin/python -m vulcan.cli "$@"
+VULCAN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+cd "$VULCAN_ROOT" || exit 1
+exec "$VULCAN_ROOT/.venv/bin/python" -m vulcan.cli "$@"

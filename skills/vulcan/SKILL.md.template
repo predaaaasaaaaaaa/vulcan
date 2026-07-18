@@ -12,7 +12,7 @@ metadata:
 # VULCAN — voice note → vertical video
 
 You (the agent) are the RELAY, not the director. ALL creative and technical
-logic lives in one CLI at `/home/preda/vulcan/bin/vulcan`. Your entire job:
+logic lives in one CLI at `{{VULCAN_ROOT}}/bin/vulcan`. Your entire job:
 **confirm intent → invoke → stream status → deliver files → clean up on
 approval.** Never edit VULCAN's files, never craft manifests yourself, never
 retry more than once.
@@ -22,13 +22,13 @@ retry more than once.
 ## 1. Command reference (everything you may run)
 
 ```bash
-/home/preda/vulcan/bin/vulcan run --latest          # forge the newest UNCONSUMED cached voice note (the normal trigger path)
-/home/preda/vulcan/bin/vulcan run /path/to/voice.ogg # forge a specific file (testing; also mp3/m4a/wav)
-/home/preda/vulcan/bin/vulcan status <RUN_ID>        # which stage artifacts exist for a run
-/home/preda/vulcan/bin/vulcan cleanup <RUN_ID>       # after user APPROVES the video: reclaim ~70% of the run's disk (keeps final.mp4 + receipts)
-/home/preda/vulcan/bin/vulcan cleanup <RUN_ID> --purge  # user took the file & wants it gone: delete the entire run dir
-/home/preda/vulcan/bin/vulcan cleanup --all          # housekeeping: clean every past run (never touches runs/golden)
-/home/preda/vulcan/bin/vulcan doctor                 # environment self-check (run if anything smells broken)
+{{VULCAN_ROOT}}/bin/vulcan run --latest          # forge the newest UNCONSUMED cached voice note (the normal trigger path)
+{{VULCAN_ROOT}}/bin/vulcan run /path/to/voice.ogg # forge a specific file (testing; also mp3/m4a/wav)
+{{VULCAN_ROOT}}/bin/vulcan status <RUN_ID>        # which stage artifacts exist for a run
+{{VULCAN_ROOT}}/bin/vulcan cleanup <RUN_ID>       # after user APPROVES the video: reclaim ~70% of the run's disk (keeps final.mp4 + receipts)
+{{VULCAN_ROOT}}/bin/vulcan cleanup <RUN_ID> --purge  # user took the file & wants it gone: delete the entire run dir
+{{VULCAN_ROOT}}/bin/vulcan cleanup --all          # housekeeping: clean every past run (never touches runs/golden)
+{{VULCAN_ROOT}}/bin/vulcan doctor                 # environment self-check (run if anything smells broken)
 ```
 
 There are no other entry points. Working dir does not matter (absolute paths
@@ -56,7 +56,7 @@ yourself and NEVER pass a path from inside `runs/` — those are OUTPUTS of
 past runs (a stale `runs/*/audio/mastered.wav` got re-forged 3 times in one
 session while the user's fresh note sat in the cache). The CLI now refuses
 `runs/` inputs outright. If you must forge a specific old file, stage a copy
-under `/home/preda/vulcan/inbox/` and pass that path. To redo the SAME note:
+under `{{VULCAN_ROOT}}/inbox/` and pass that path. To redo the SAME note:
 ask the user to re-send it.
 
 ## 3. How to invoke (exact mechanics)
@@ -68,7 +68,7 @@ ALWAYS run it in the background and poll:
 
 ```bash
 # start (backgrounded, output captured) — this exact line, nothing fancier:
-nohup /home/preda/vulcan/bin/vulcan run --latest > /tmp/vulcan_run.log 2>&1 &
+nohup {{VULCAN_ROOT}}/bin/vulcan run --latest > /tmp/vulcan_run.log 2>&1 &
 
 # poll every ~30s (cheap, non-blocking):
 tail -5 /tmp/vulcan_run.log
@@ -79,7 +79,7 @@ tail -5 /tmp/vulcan_run.log
 If your harness has a dedicated background-process tool, prefer it over
 `nohup` — same contract: start, poll the output file, react to DONE/ERROR.
 
-**ALWAYS use `/home/preda/vulcan/bin/vulcan`** — never `python3 -m vulcan.cli`
+**ALWAYS use `{{VULCAN_ROOT}}/bin/vulcan`** — never `python3 -m vulcan.cli`
 (the system python lacks the deps; the wrapper pins the project venv; the CLI
 now fails fast with the fix if you get this wrong).
 
@@ -98,7 +98,7 @@ pkill -9 -f "vulcan\.cli run"    # then wait 2s, verify with: pgrep -af vulcan.c
 | `RUN_ID <id>` | `RUN_ID v_20260712_105540` | remember it — needed for status/cleanup |
 | `STATUS n/7 <text>` | `STATUS 5/7 render — Remotion is forging the video` | relay a SHORT progress message at stages 1, 3, 5, 7 only. Suggested voice: 1→"🎙️ Got it, mastering your audio…" · 3→"🎬 Cutting it into beats…" · 5→"🔨 Rendering — ~2 min" · 7→"📦 Packaging…" |
 | `STATUS asset fallback: …` | `…b14 → kinetic_type (failed: ['a04'])` | ignore (internal resilience, not an error) |
-| `DELIVER MEDIA:<path>` | `DELIVER MEDIA:/home/preda/vulcan/runs/v_…/out/final.mp4` | send a message whose text contains exactly `MEDIA:<that path>` → platform delivers the native video |
+| `DELIVER MEDIA:<path>` | `DELIVER MEDIA:{{VULCAN_ROOT}}/runs/v_…/out/final.mp4` | send a message whose text contains exactly `MEDIA:<that path>` → platform delivers the native video |
 | `DELIVER_SHEET MEDIA:<path>` | contact sheet png | only send if the user asks for details/frames |
 | `POST_KIT_START … POST_KIT_END` | hook line, caption, hashtags | send the text between the markers as a normal message, right after the video |
 | `DONE <id> <path>` | `DONE v_… /home/…/final.mp4` | run finished clean — deliver if you haven't already |
@@ -121,7 +121,7 @@ read it from there; do not declare it "missing" because no file matches
 > *(poll; on STATUS 3)* "🎬 Cutting your words into beats…"
 > *(poll; on STATUS 5)* "🔨 Rendering now, ~2 minutes…"
 > *(log shows DONE v_20260712_1234)*
-> **You:** message 1: `MEDIA:/home/preda/vulcan/runs/v_20260712_1234/out/final.mp4`
+> **You:** message 1: `MEDIA:{{VULCAN_ROOT}}/runs/v_20260712_1234/out/final.mp4`
 > **You:** message 2: the post-kit text (hook / caption / hashtags)
 > **User:** "perfect, taking it 🔥"
 > **You:** run `cleanup v_20260712_1234` → "🧹 Cleaned up — 18MB freed, ready for the next one."
@@ -142,7 +142,7 @@ guarantees `--latest` never re-forges an old note; cleanup keeps the rest tidy:
   the artifacts are the debugging trail. Clean only after the accepted take.
 - **If the user says get rid of it entirely**: `cleanup <RUN_ID> --purge`.
 - **Weekly housekeeping** (or when disk complains): `cleanup --all`.
-- Never delete anything under `/home/preda/vulcan` by hand — cleanup is the
+- Never delete anything under `{{VULCAN_ROOT}}` by hand — cleanup is the
   only sanctioned mutation, and `runs/golden/` is never cleaned (reference).
 
 ## 7. Failure playbook (exact user-facing messages)
@@ -171,15 +171,15 @@ quote its last lines if the user asks what happened.
 ## 8. For non-Hermes agents adopting this skill
 
 Everything above holds with two substitutions: (a) your platform's voice-note
-cache dirs go in `/home/preda/vulcan/config.yaml → trigger.voice_cache_dirs`
+cache dirs go in `{{VULCAN_ROOT}}/config.yaml → trigger.voice_cache_dirs`
 (or skip `--latest` and pass explicit paths); (b) replace the `MEDIA:` sending
 convention with however your platform sends a local video file. The
 CLI protocol (§4), the cleanup doctrine (§6), and the playbook (§7) are
-platform-agnostic. Full integration guide: `/home/preda/vulcan/README.md` §6.
+platform-agnostic. Full integration guide: `{{VULCAN_ROOT}}/README.md` §6.
 
 ## 9. Hard rules
 
-- ONE run at a time; never edit files under `/home/preda/vulcan` (invoke the CLI only).
+- ONE run at a time; never edit files under `{{VULCAN_ROOT}}` (invoke the CLI only).
 - **You are the relay, not the mechanic.** NEVER `pip install` anything, NEVER
   patch VULCAN's code, prompts, or `config.yaml`, NEVER "fix" the pipeline —
   even when you can see the bug. Report the failure with the last 20 lines of
