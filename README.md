@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.svg" alt="VULCAN — voice note to viral vertical video" width="100%">
+</p>
+
 # VULCAN — Voice-to-Video Forge
 
 **A voice note goes in. A publish-ready vertical video comes out.**
