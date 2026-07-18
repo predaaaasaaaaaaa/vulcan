@@ -11,3 +11,7 @@ fixtures/*.wav
 inbox/
 *.ogg
 !fixtures/*.ogg
+
+# local agent/tool state — never ship
+/CLAUDE.md
+/.claude/
