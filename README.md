@@ -19,6 +19,28 @@ around one idea:
 
 ---
 
+## Quickstart
+
+```bash
+git clone <this-repo> ~/vulcan && cd ~/vulcan
+./setup.sh                                # prereqs → venv → deps → browser → sfx → doctor
+bin/vulcan run fixtures/fixture_60s.ogg   # full pipeline on the bundled test note
+bin/vulcan setup-agent hermes             # wire your agent (or: openclaw | generic)
+```
+
+Point `config.yaml → director:` at any Anthropic-compatible `/v1/messages`
+endpoint (every field explained in [config.example.yaml](config.example.yaml)),
+list your platform's voice-note cache dirs in `trigger.voice_cache_dirs` — and
+your agent forges videos. Adopter's guide: §6 below.
+
+## Showcase
+
+<!-- sample output goes here: 3-4 frames or a GIF (runs/golden/qc/ has full
+     contact sheets after `tests/build_golden.py` + a render) -->
+*Coming soon — golden-run frames and a real forged reel.*
+
+---
+
 ## 1. The pipeline
 
 ```
@@ -165,7 +187,7 @@ designed for retry injection). Non-negotiables:
   exist in `sfx/index.json`;
 - **render gate**: every referenced asset `validated` with its file on disk.
 
-64 unit tests (`tests/`) cover the validator, beat math, and the
+102 unit tests (`tests/`) cover the validator, beat math, and the
 Director's assembly/patch layers — including adversarial manifests (overlaps,
 gaps, orphans, hallucinated cues, out-of-range anchors, malformed payloads).
 
@@ -175,13 +197,14 @@ gaps, orphans, hallucinated cues, out-of-range anchors, malformed payloads).
 
 ```
 ~/vulcan/
-├── CLAUDE.md            # the build spec (architect: Claude Opus)
+├── README.md            # you are here
 ├── BUILDLOG.md          # every decision + phase gate + evidence path
-├── RECON.md             # Phase-0 map of Hermes internals (how integration works)
 ├── FEEDBACK.md          # golden-run feedback loop
-├── config.yaml          # ALL tunables (calibrated values marked with BUILDLOG refs)
+├── docs/                # BUILD-SPEC.md (original build doctrine) + RECON.md (Hermes internals)
+├── setup.sh             # idempotent auto-setup: prereqs → venv → deps → browser → sfx → doctor
+├── config.yaml          # ALL tunables (config.example.yaml = fully commented reference)
 ├── requirements.txt / requirements.lock.txt
-├── bin/vulcan           # the one CLI Hermes invokes
+├── bin/vulcan           # the one CLI an agent invokes (self-locating wrapper)
 ├── vulcan/              # python package
 │   ├── cli.py           # orchestrator: run/status/doctor, STATUS protocol
 │   ├── ingest.py asr.py beats.py validate.py render.py qc.py deliver.py
@@ -193,8 +216,8 @@ gaps, orphans, hallucinated cues, out-of-range anchors, malformed payloads).
 │   ├── src/ (tokens, Master, Captions, Background, Camera, Transitions, Sfx, treatments/)
 │   └── public/ (fonts/Outfit committed; runs/ + sfx/ symlinks)
 ├── sfx/                 # 43 wavs + index.json + build_sfx.py
-├── skills/vulcan/SKILL.md  # Hermes operating manual (registered via external_dirs)
-├── tests/               # 64 unit tests + phase3_gate.py + build_golden.py
+├── skills/vulcan/       # SKILL.md.template → SKILL.md generated per-clone by setup-agent
+├── tests/               # 102 unit tests + phase3_gate.py + build_golden.py
 ├── fixtures/            # 62s + 150s public-domain test voice notes
 ├── cache/media.db       # cross-run asset cache with SigLIP embeddings
 └── runs/<video_id>/     # per-run audit trail
@@ -204,8 +227,9 @@ gaps, orphans, hallucinated cues, out-of-range anchors, malformed payloads).
 
 ## 4. How Hermes uses it (exact mechanics)
 
-This is wired into the Hermes install at `~/.hermes` on this machine
-(full recon in [RECON.md](RECON.md)):
+This is how VULCAN wires into a Hermes install at `~/.hermes` —
+`bin/vulcan setup-agent hermes` performs the registration automatically
+(full recon in [docs/RECON.md](docs/RECON.md)):
 
 1. **Trigger.** A Telegram voice note arrives → Hermes's gateway caches it at
    `~/.hermes/cache/audio/audio_<hex>.ogg` and hands the agent the transcript
@@ -285,16 +309,15 @@ Hermes on another box, OpenClaw, a custom agent, anything that can run a CLI.)*
 ### Install
 ```bash
 git clone <this repo> ~/vulcan && cd ~/vulcan
-python3 -m venv .venv            # add --system-site-packages if you already have torch
-.venv/bin/pip install -r requirements.txt
-cd remotion && npm install && cd ..
-npx puppeteer browsers install chrome-headless-shell   # if no Chrome available
-.venv/bin/python sfx/build_sfx.py                      # regenerate the 43 SFX cues
-.venv/bin/python -m pytest tests/ -q                   # 64 tests must pass
-bin/vulcan doctor                                      # everything ✅ before first run
+./setup.sh                              # prereq checks → venv (CPU torch when needed)
+                                        # → npm install → headless-browser fallback
+                                        # → SFX/music rebuild → bin/vulcan doctor
+.venv/bin/python -m pytest tests/ -q    # 102 tests must pass
+bin/vulcan setup-agent hermes           # or: openclaw | generic — wires your agent
 ```
-First run downloads SigLIP (~780MB), whisper-small, and rembg-isnet (~170MB)
-into local caches; after that it's offline except asset search + LLM calls.
+`setup.sh` is idempotent — re-run it after pulling updates. First run downloads
+SigLIP (~780MB), whisper-small (~460MB), and rembg-isnet (~170MB) into local
+caches; after that it's offline except asset search + LLM calls.
 
 ### Wire your agent (the contract)
 Your agent needs exactly three behaviors — copy the doctrine from
@@ -344,6 +367,6 @@ in `vulcan/director/prompts/pass_b.md` + the enums in
 ---
 
 *Built 2026-07-12. Full decision log with evidence: [BUILDLOG.md](BUILDLOG.md).
-Integration recon: [RECON.md](RECON.md). License for the code in this repo: MIT
+Integration recon: [docs/RECON.md](docs/RECON.md). License: [MIT](LICENSE)
 (assets fetched at runtime keep their own licenses; SFX are CC0-by-construction;
 Outfit font is OFL).*

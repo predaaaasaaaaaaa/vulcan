@@ -6,17 +6,17 @@ Chronological decisions, phase verdicts, evidence. Newest entries appended at th
 ## PHASE 0 — RECON
 **Status: ✅ PASS** — 2026-07-12
 
-- Mapped Hermes end-to-end (install, gateway pid 2117, MiniMax config, voice-note flow, send path, skill registration). Full detail: [RECON.md](RECON.md).
+- Mapped Hermes end-to-end (install, gateway pid 2117, MiniMax config, voice-note flow, send path, skill registration). Full detail: [RECON.md](docs/RECON.md).
 - Decision: `vulcan run --latest` resolves the voice file itself — traced `gateway/run.py:13495`: when STT is on, the agent sees the transcript but **never the file path**, so MiniMax must not be asked to supply one.
 - Decision: delivery via Hermes `send_message` tool with `MEDIA:<path>` convention (traced `tools/send_message_tool.py:165`).
 - Decision: register skill via `skills.external_dirs` (additive config.yaml entry) — no Hermes files modified.
-- HyperFrames autopsy (5 bullets in RECON.md §2). Evidence: contact sheet extracted from `~/hermes-demo/hermes-final-v5.mp4` — landscape slide-deck, no word sync, no assets. Confirms every VULCAN prime directive.
+- HyperFrames autopsy (5 bullets in docs/RECON.md §2). Evidence: contact sheet extracted from `~/hermes-demo/hermes-final-v5.mp4` — landscape slide-deck, no word sync, no assets. Confirms every VULCAN prime directive.
 - Hardware: 12 cores / 7.1GB RAM (constraint — sequential stages, tuned Remotion concurrency) / RTX 2050 4GB (unused for now, CPU-first) / 255GB disk / node 22 / python 3.12 / ffmpeg 6.1 / torch cu128 pre-installed in user site.
 - Network: all asset sources reachable except lottiefiles.com HTML (403 bot-guard) — swapped per dead-source rule: lottie via direct CDN URLs or curated local pack, decided in Phase 3/4.
 - MiniMax key: present in `~/.hermes/.env` as `MINIMAX_API_KEY` (no blocker).
 - Disk: 255GB ≥ 10GB (no blocker).
 
-**Evidence:** [RECON.md](RECON.md), scratchpad `hf_autopsy/hf_v5_sheet.png`.
+**Evidence:** [RECON.md](docs/RECON.md), scratchpad `hf_autopsy/hf_v5_sheet.png`.
 
 ---
 
